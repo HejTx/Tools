@@ -1,6 +1,7 @@
 #include "todolist.hpp"
 #include <cassert>
 #include <iostream>
+#include <sstream>
 
 void test_konec() {
     Prikaz p = rozeberPrikaz("q");
@@ -56,6 +57,43 @@ void test_neznamy_prikaz() {
     assert(p.typ == TypPrikazu::Neznamy);
 }
 
+void test_vykresli_prazdny_seznam() {
+    std::ostringstream out;
+    vykresliObrazovku(out, {}, "");
+    assert(out.str() ==
+        "=== Ukoly ===\n"
+        "Zadne ukoly.\n"
+        "\n"
+        "Prikazy: p <popis> | o <id> | r <id> | s (ulozit) | q (ulozit a konec)\n"
+        "> ");
+}
+
+void test_vykresli_ukoly_hotovy_sede() {
+    std::ostringstream out;
+    std::vector<Task> ukoly = {{1, "nakoupit", true}, {2, "uklidit", false}};
+    vykresliObrazovku(out, ukoly, "");
+    assert(out.str() ==
+        "=== Ukoly ===\n"
+        "\033[90mID: 1, Popis: nakoupit, Dokonceno: Ano\033[0m\n"
+        "ID: 2, Popis: uklidit, Dokonceno: Ne\n"
+        "\n"
+        "Prikazy: p <popis> | o <id> | r <id> | s (ulozit) | q (ulozit a konec)\n"
+        "> ");
+}
+
+void test_vykresli_se_zpravou() {
+    std::ostringstream out;
+    vykresliObrazovku(out, {}, "Ukol pridan.");
+    assert(out.str() ==
+        "=== Ukoly ===\n"
+        "Zadne ukoly.\n"
+        "\n"
+        "Ukol pridan.\n"
+        "\n"
+        "Prikazy: p <popis> | o <id> | r <id> | s (ulozit) | q (ulozit a konec)\n"
+        "> ");
+}
+
 int main() {
     test_konec();
     test_vypsat();
@@ -67,6 +105,9 @@ int main() {
     test_oznacit_chybne_id();
     test_oznacit_chybejici_id();
     test_neznamy_prikaz();
+    test_vykresli_prazdny_seznam();
+    test_vykresli_ukoly_hotovy_sede();
+    test_vykresli_se_zpravou();
 
     std::cout << "Vsechny testy prosly.\n";
     return 0;

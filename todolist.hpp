@@ -58,13 +58,17 @@ inline std::vector<Task> nactiUkoly(const std::string& soubor) {
     return ukoly;
 }
 
-inline void vytiskniUkol(const Task& ukol) {
-    std::cout << "ID: " << ukol.id << ", Popis: " << ukol.description << ", Dokonceno: " << (ukol.done ? "Ano" : "Ne") << "\n";
+inline void vytiskniUkol(std::ostream& out, const Task& ukol) {
+    if (ukol.done) out << "\033[90m";
+    out << "ID: " << ukol.id << ", Popis: " << ukol.description
+        << ", Dokonceno: " << (ukol.done ? "Ano" : "Ne");
+    if (ukol.done) out << "\033[0m";
+    out << "\n";
 }
 
-inline void vytiskniUkoly(const std::vector<Task>& ukoly) {
+inline void vytiskniUkoly(std::ostream& out, const std::vector<Task>& ukoly) {
     for (const auto& ukol : ukoly) {
-        vytiskniUkol(ukol);
+        vytiskniUkol(out, ukol);
     }
 }
 
@@ -148,4 +152,21 @@ inline Prikaz rozeberPrikaz(const std::string& radek) {
     }
 
     return prikaz;
+}
+
+inline void vykresliObrazovku(std::ostream& out,
+                              const std::vector<Task>& ukoly,
+                              const std::string& zprava) {
+    out << "=== Ukoly ===\n";
+    if (ukoly.empty()) {
+        out << "Zadne ukoly.\n";
+    } else {
+        vytiskniUkoly(out, ukoly);
+    }
+    out << "\n";
+    if (!zprava.empty()) {
+        out << zprava << "\n\n";
+    }
+    out << "Prikazy: p <popis> | o <id> | r <id> | s (ulozit) | q (ulozit a konec)\n"
+        << "> ";
 }

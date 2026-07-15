@@ -25,7 +25,7 @@ int main() {
 
         switch (prikaz.typ) {
             case TypPrikazu::Vypsat:
-                vytiskniUkoly(ukoly);
+                vytiskniUkoly(std::cout, ukoly);
                 break;
             case TypPrikazu::Pridat:
                 if (prikaz.popis.find(';') != std::string::npos) {
