@@ -12,6 +12,11 @@ void test_vypsat() {
     assert(p.typ == TypPrikazu::Vypsat);
 }
 
+void test_ulozit() {
+    Prikaz p = rozeberPrikaz("s");
+    assert(p.typ == TypPrikazu::Ulozit);
+}
+
 void test_pridat_s_popisem() {
     Prikaz p = rozeberPrikaz("p Udelat si obed");
     assert(p.typ == TypPrikazu::Pridat);
@@ -54,6 +59,7 @@ void test_neznamy_prikaz() {
 int main() {
     test_konec();
     test_vypsat();
+    test_ulozit();
     test_pridat_s_popisem();
     test_pridat_bez_popisu();
     test_oznacit_platne_id();

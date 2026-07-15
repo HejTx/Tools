@@ -6,7 +6,8 @@ void vypisNapovedu() {
               << "  v          - vypsat ukoly\n"
               << "  o <id>     - oznacit ukol jako hotovy\n"
               << "  r <id>     - odebrat ukol\n"
-              << "  q          - konec\n"
+              << "  s          - ulozit ukoly do souboru\n"
+              << "  q          - ulozit a ukoncit\n"
               << "> ";
 }
 
@@ -42,6 +43,10 @@ int main() {
                 if (!odebratUkol(ukoly, prikaz.id)) {
                     std::cout << "Ukol s ID " << prikaz.id << " nenalezen.\n";
                 }
+                break;
+            case TypPrikazu::Ulozit:
+                ulozUkoly(ukoly, soubor);
+                std::cout << "Ukoly ulozeny do souboru.\n";
                 break;
             case TypPrikazu::Konec:
                 break;
