@@ -7,6 +7,8 @@
 #include <vector>
 #include <algorithm>
 
+#include "sifrovani.hpp"
+
 struct Task {
     int id;
     std::string description;
@@ -47,28 +49,27 @@ inline std::vector<Task> parsujUkoly(const std::string& obsah) {
     return ukoly;
 }
 
-// Uloží úkoly do souboru
-inline void ulozUkoly(const std::vector<Task>& ukoly, const std::string& soubor) {
-    std::ofstream out(soubor);
+// Uloží úkoly zašifrovaně (stejný klíč a sůl, nová nonce při každém zápisu)
+inline void ulozUkoly(const std::vector<Task>& ukoly, const std::string& soubor,
+                      const std::vector<unsigned char>& klic,
+                      const std::array<unsigned char, crypto_pwhash_SALTBYTES>& sul) {
+    std::ofstream out(soubor, std::ios::binary);
     if (!out) {
         std::cerr << "Nepodarilo se otevrit soubor pro zapis: " << soubor << "\n";
         return;
     }
 
-    out << serializujUkoly(ukoly);
+    out << zasifruj(serializujUkoly(ukoly), klic, sul);
 }
 
-// Načte úkoly ze souboru
-inline std::vector<Task> nactiUkoly(const std::string& soubor) {
-    std::ifstream in(soubor);
-    if (!in) {
-        std::cerr << "Soubor " << soubor << " neexistuje, zacinam s prazdnym seznamem.\n";
-        return {};
-    }
+// Přečte celý soubor jako syrové bajty. nullopt = soubor nejde otevřít.
+inline std::optional<std::string> nactiObsahSouboru(const std::string& soubor) {
+    std::ifstream in(soubor, std::ios::binary);
+    if (!in) return std::nullopt;
 
     std::ostringstream ss;
     ss << in.rdbuf();
-    return parsujUkoly(ss.str());
+    return ss.str();
 }
 
 inline void vytiskniUkol(std::ostream& out, const Task& ukol) {
