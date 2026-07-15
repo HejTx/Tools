@@ -27,7 +27,11 @@ int main() {
                 vytiskniUkoly(ukoly);
                 break;
             case TypPrikazu::Pridat:
-                pridatUkol(ukoly, prikaz.popis);
+                if (prikaz.popis.find(';') != std::string::npos) {
+                    std::cout << "Popis nesmi obsahovat znak ';'.\n";
+                } else {
+                    pridatUkol(ukoly, prikaz.popis);
+                }
                 break;
             case TypPrikazu::Oznacit:
                 if (!oznacitUkolDokonceny(ukoly, prikaz.id)) {
