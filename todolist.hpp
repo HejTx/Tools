@@ -104,3 +104,46 @@ inline bool oznacitUkolDokonceny(std::vector<Task>& ukoly, int id) {
     }
     return false;
 }
+
+enum class TypPrikazu { Pridat, Vypsat, Oznacit, Odebrat, Konec, Neznamy };
+
+struct Prikaz {
+    TypPrikazu typ = TypPrikazu::Neznamy;
+    std::string popis;
+    int id = -1;
+};
+
+inline Prikaz rozeberPrikaz(const std::string& radek) {
+    Prikaz prikaz;
+    std::istringstream ss(radek);
+    std::string token;
+    ss >> token;
+
+    if (token == "q") {
+        prikaz.typ = TypPrikazu::Konec;
+    } else if (token == "v") {
+        prikaz.typ = TypPrikazu::Vypsat;
+    } else if (token == "p") {
+        prikaz.typ = TypPrikazu::Pridat;
+        std::string zbytek;
+        std::getline(ss, zbytek);
+        size_t start = zbytek.find_first_not_of(' ');
+        prikaz.popis = (start == std::string::npos) ? "" : zbytek.substr(start);
+    } else if (token == "o" || token == "r") {
+        prikaz.typ = (token == "o") ? TypPrikazu::Oznacit : TypPrikazu::Odebrat;
+        std::string idStr;
+        if (ss >> idStr) {
+            try {
+                prikaz.id = std::stoi(idStr);
+            } catch (...) {
+                prikaz.typ = TypPrikazu::Neznamy;
+            }
+        } else {
+            prikaz.typ = TypPrikazu::Neznamy;
+        }
+    } else {
+        prikaz.typ = TypPrikazu::Neznamy;
+    }
+
+    return prikaz;
+}
