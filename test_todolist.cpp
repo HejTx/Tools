@@ -1,4 +1,5 @@
 #include "todolist.hpp"
+#include "sifrovani.hpp"
 #include <cassert>
 #include <iostream>
 #include <sstream>
@@ -114,7 +115,68 @@ void test_parsovani_preskoci_prazdne_radky() {
     assert(zpet[1].description == "b" && zpet[1].done == true);
 }
 
+void test_sifrovani_roundtrip() {
+    std::array<unsigned char, crypto_pwhash_SALTBYTES> sul;
+    randombytes_buf(sul.data(), sul.size());
+    std::vector<unsigned char> klic = odvodKlic("tajneheslo", sul.data());
+
+    std::string kontejner = zasifruj("1;nakoupit;1\n", klic, sul);
+    assert(jeSifrovany(kontejner));
+
+    std::optional<VysledekDesifrovani> vysledek = desifruj(kontejner, "tajneheslo");
+    assert(vysledek.has_value());
+    assert(vysledek->plaintext == "1;nakoupit;1\n");
+    assert(vysledek->klic == klic);
+    assert(vysledek->sul == sul);
+}
+
+void test_sifrovani_prazdny_plaintext() {
+    std::array<unsigned char, crypto_pwhash_SALTBYTES> sul;
+    randombytes_buf(sul.data(), sul.size());
+    std::vector<unsigned char> klic = odvodKlic("tajneheslo", sul.data());
+
+    std::string kontejner = zasifruj("", klic, sul);
+    std::optional<VysledekDesifrovani> vysledek = desifruj(kontejner, "tajneheslo");
+    assert(vysledek.has_value());
+    assert(vysledek->plaintext == "");
+}
+
+void test_spatne_heslo() {
+    std::array<unsigned char, crypto_pwhash_SALTBYTES> sul;
+    randombytes_buf(sul.data(), sul.size());
+    std::vector<unsigned char> klic = odvodKlic("spravne", sul.data());
+
+    std::string kontejner = zasifruj("data", klic, sul);
+    assert(!desifruj(kontejner, "spatne").has_value());
+}
+
+void test_poskozeny_soubor() {
+    std::array<unsigned char, crypto_pwhash_SALTBYTES> sul;
+    randombytes_buf(sul.data(), sul.size());
+    std::vector<unsigned char> klic = odvodKlic("tajneheslo", sul.data());
+
+    std::string kontejner = zasifruj("data", klic, sul);
+    kontejner.back() ^= 0x01;
+    assert(!desifruj(kontejner, "tajneheslo").has_value());
+}
+
+void test_zkraceny_vstup() {
+    assert(!desifruj("", "x").has_value());
+    assert(!desifruj("TODOENC1", "x").has_value());
+    assert(!desifruj(std::string("TODOENC1") + "kratke", "x").has_value());
+}
+
+void test_jeSifrovany_stary_format() {
+    assert(!jeSifrovany("1;nakoupit;0\n"));
+    assert(!jeSifrovany(""));
+}
+
 int main() {
+    if (sodium_init() < 0) {
+        std::cerr << "Nepodarilo se inicializovat libsodium.\n";
+        return 1;
+    }
+
     test_konec();
     test_vypsat_je_neznamy();
     test_ulozit();
@@ -131,6 +193,12 @@ int main() {
     test_serializace_format();
     test_parsovani_roundtrip();
     test_parsovani_preskoci_prazdne_radky();
+    test_sifrovani_roundtrip();
+    test_sifrovani_prazdny_plaintext();
+    test_spatne_heslo();
+    test_poskozeny_soubor();
+    test_zkraceny_vstup();
+    test_jeSifrovany_stary_format();
 
     std::cout << "Vsechny testy prosly.\n";
     return 0;
