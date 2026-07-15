@@ -3,7 +3,6 @@
 void vypisNapovedu() {
     std::cout << "\nPrikazy:\n"
               << "  p <popis>  - pridat ukol\n"
-              << "  v          - vypsat ukoly\n"
               << "  o <id>     - oznacit ukol jako hotovy\n"
               << "  r <id>     - odebrat ukol\n"
               << "  s          - ulozit ukoly do souboru\n"
@@ -24,9 +23,6 @@ int main() {
         if (prikaz.typ == TypPrikazu::Konec) break;
 
         switch (prikaz.typ) {
-            case TypPrikazu::Vypsat:
-                vytiskniUkoly(std::cout, ukoly);
-                break;
             case TypPrikazu::Pridat:
                 if (prikaz.popis.find(';') != std::string::npos) {
                     std::cout << "Popis nesmi obsahovat znak ';'.\n";

@@ -8,9 +8,9 @@ void test_konec() {
     assert(p.typ == TypPrikazu::Konec);
 }
 
-void test_vypsat() {
+void test_vypsat_je_neznamy() {
     Prikaz p = rozeberPrikaz("v");
-    assert(p.typ == TypPrikazu::Vypsat);
+    assert(p.typ == TypPrikazu::Neznamy);
 }
 
 void test_ulozit() {
@@ -96,7 +96,7 @@ void test_vykresli_se_zpravou() {
 
 int main() {
     test_konec();
-    test_vypsat();
+    test_vypsat_je_neznamy();
     test_ulozit();
     test_pridat_s_popisem();
     test_pridat_bez_popisu();
