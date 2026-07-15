@@ -1,22 +1,14 @@
 #include "todolist.hpp"
 
-void vypisNapovedu() {
-    std::cout << "\nPrikazy:\n"
-              << "  p <popis>  - pridat ukol\n"
-              << "  o <id>     - oznacit ukol jako hotovy\n"
-              << "  r <id>     - odebrat ukol\n"
-              << "  s          - ulozit ukoly do souboru\n"
-              << "  q          - ulozit a ukoncit\n"
-              << "> ";
-}
-
 int main() {
     const std::string soubor = "ukoly.txt";
     std::vector<Task> ukoly = nactiUkoly(soubor);
 
     std::string radek;
+    std::string zprava;
     while (true) {
-        vypisNapovedu();
+        std::cout << "\033[2J\033[H";
+        vykresliObrazovku(std::cout, ukoly, zprava);
         if (!std::getline(std::cin, radek)) break;
 
         Prikaz prikaz = rozeberPrikaz(radek);
@@ -25,33 +17,39 @@ int main() {
         switch (prikaz.typ) {
             case TypPrikazu::Pridat:
                 if (prikaz.popis.find(';') != std::string::npos) {
-                    std::cout << "Popis nesmi obsahovat znak ';'.\n";
+                    zprava = "Popis nesmi obsahovat znak ';'.";
                 } else {
                     pridatUkol(ukoly, prikaz.popis);
+                    zprava = "Ukol pridan.";
                 }
                 break;
             case TypPrikazu::Oznacit:
-                if (!oznacitUkolDokonceny(ukoly, prikaz.id)) {
-                    std::cout << "Ukol s ID " << prikaz.id << " nenalezen.\n";
+                if (oznacitUkolDokonceny(ukoly, prikaz.id)) {
+                    zprava = "Ukol " + std::to_string(prikaz.id) + " oznacen jako hotovy.";
+                } else {
+                    zprava = "Ukol s ID " + std::to_string(prikaz.id) + " nenalezen.";
                 }
                 break;
             case TypPrikazu::Odebrat:
-                if (!odebratUkol(ukoly, prikaz.id)) {
-                    std::cout << "Ukol s ID " << prikaz.id << " nenalezen.\n";
+                if (odebratUkol(ukoly, prikaz.id)) {
+                    zprava = "Ukol " + std::to_string(prikaz.id) + " odebran.";
+                } else {
+                    zprava = "Ukol s ID " + std::to_string(prikaz.id) + " nenalezen.";
                 }
                 break;
             case TypPrikazu::Ulozit:
                 ulozUkoly(ukoly, soubor);
-                std::cout << "Ukoly ulozeny do souboru.\n";
+                zprava = "Ukoly ulozeny.";
                 break;
             case TypPrikazu::Konec:
                 break;
             default:
-                std::cout << "Neznamy prikaz.\n";
+                zprava = "Neznamy prikaz.";
                 break;
         }
     }
 
     ulozUkoly(ukoly, soubor);
+    std::cout << "\nUkoly ulozeny. Nashledanou.\n";
     return 0;
 }
