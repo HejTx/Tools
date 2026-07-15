@@ -38,10 +38,13 @@ std::optional<std::string> zvolNoveHeslo() {
         if (!druhe) return std::nullopt;
 
         if (*prvni != *druhe) {
+            sodium_memzero(prvni->data(), prvni->size());
+            sodium_memzero(druhe->data(), druhe->size());
             std::cout << "Hesla se neshoduji, zkus to znovu.\n";
         } else if (prvni->empty()) {
             std::cout << "Heslo nesmi byt prazdne.\n";
         } else {
+            sodium_memzero(druhe->data(), druhe->size());
             return prvni;
         }
     }

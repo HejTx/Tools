@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <cstdio>
 
 #include "sifrovani.hpp"
 
@@ -49,17 +50,33 @@ inline std::vector<Task> parsujUkoly(const std::string& obsah) {
     return ukoly;
 }
 
-// Uloží úkoly zašifrovaně (stejný klíč a sůl, nová nonce při každém zápisu)
+// Uloží úkoly zašifrovaně (stejný klíč a sůl, nová nonce při každém zápisu).
+// Zapisuje přes dočasný soubor a rename, aby selhání zápisu nezničilo původní data.
 inline void ulozUkoly(const std::vector<Task>& ukoly, const std::string& soubor,
                       const std::vector<unsigned char>& klic,
                       const std::array<unsigned char, crypto_pwhash_SALTBYTES>& sul) {
-    std::ofstream out(soubor, std::ios::binary);
+    const std::string docasny = soubor + ".tmp";
+
+    std::ofstream out(docasny, std::ios::binary);
     if (!out) {
-        std::cerr << "Nepodarilo se otevrit soubor pro zapis: " << soubor << "\n";
+        std::cerr << "Nepodarilo se otevrit soubor pro zapis: " << docasny << "\n";
         return;
     }
 
     out << zasifruj(serializujUkoly(ukoly), klic, sul);
+    out.flush();
+    if (!out) {
+        std::cerr << "Zapis do souboru " << docasny << " se nezdaril, puvodni data zustavaji.\n";
+        out.close();
+        std::remove(docasny.c_str());
+        return;
+    }
+    out.close();
+
+    if (std::rename(docasny.c_str(), soubor.c_str()) != 0) {
+        std::cerr << "Nepodarilo se prejmenovat " << docasny << " na " << soubor << ".\n";
+        std::remove(docasny.c_str());
+    }
 }
 
 // Přečte celý soubor jako syrové bajty. nullopt = soubor nejde otevřít.
