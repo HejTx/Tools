@@ -13,29 +13,18 @@ struct Task {
     bool done = false;
 };
 
-// Uloží úkoly do souboru ukoly.md
-inline void ulozUkoly(const std::vector<Task>& ukoly, const std::string& soubor) {
-    std::ofstream out(soubor);
-    if (!out) {
-        std::cerr << "Nepodarilo se otevrit soubor pro zapis: " << soubor << "\n";
-        return;
-    }
-
+inline std::string serializujUkoly(const std::vector<Task>& ukoly) {
+    std::ostringstream out;
     for (const auto& ukol : ukoly) {
         out << ukol.id << ";" << ukol.description << ";" << ukol.done << "\n";
     }
+    return out.str();
 }
 
-// Načte úkoly ze souboru ukoly.md
-inline std::vector<Task> nactiUkoly(const std::string& soubor) {
+inline std::vector<Task> parsujUkoly(const std::string& obsah) {
     std::vector<Task> ukoly;
 
-    std::ifstream in(soubor);
-    if (!in) {
-        std::cerr << "Soubor " << soubor << " neexistuje, zacinam s prazdnym seznamem.\n";
-        return ukoly;
-    }
-
+    std::istringstream in(obsah);
     std::string line;
     while (std::getline(in, line)) {
         if (line.empty()) continue;
@@ -56,6 +45,30 @@ inline std::vector<Task> nactiUkoly(const std::string& soubor) {
     }
 
     return ukoly;
+}
+
+// Uloží úkoly do souboru
+inline void ulozUkoly(const std::vector<Task>& ukoly, const std::string& soubor) {
+    std::ofstream out(soubor);
+    if (!out) {
+        std::cerr << "Nepodarilo se otevrit soubor pro zapis: " << soubor << "\n";
+        return;
+    }
+
+    out << serializujUkoly(ukoly);
+}
+
+// Načte úkoly ze souboru
+inline std::vector<Task> nactiUkoly(const std::string& soubor) {
+    std::ifstream in(soubor);
+    if (!in) {
+        std::cerr << "Soubor " << soubor << " neexistuje, zacinam s prazdnym seznamem.\n";
+        return {};
+    }
+
+    std::ostringstream ss;
+    ss << in.rdbuf();
+    return parsujUkoly(ss.str());
 }
 
 inline void vytiskniUkol(std::ostream& out, const Task& ukol) {

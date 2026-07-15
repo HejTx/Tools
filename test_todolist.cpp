@@ -94,6 +94,26 @@ void test_vykresli_se_zpravou() {
         "> ");
 }
 
+void test_serializace_format() {
+    std::vector<Task> ukoly = {{1, "nakoupit", true}, {2, "uklidit", false}};
+    assert(serializujUkoly(ukoly) == "1;nakoupit;1\n2;uklidit;0\n");
+    assert(serializujUkoly({}) == "");
+}
+
+void test_parsovani_roundtrip() {
+    std::vector<Task> ukoly = {{1, "nakoupit", true}, {2, "uklidit", false}};
+    std::vector<Task> zpet = parsujUkoly(serializujUkoly(ukoly));
+    assert(zpet.size() == 2);
+    assert(zpet[0].id == 1 && zpet[0].description == "nakoupit" && zpet[0].done == true);
+    assert(zpet[1].id == 2 && zpet[1].description == "uklidit" && zpet[1].done == false);
+}
+
+void test_parsovani_preskoci_prazdne_radky() {
+    std::vector<Task> zpet = parsujUkoly("1;a;0\n\n2;b;1\n");
+    assert(zpet.size() == 2);
+    assert(zpet[1].description == "b" && zpet[1].done == true);
+}
+
 int main() {
     test_konec();
     test_vypsat_je_neznamy();
@@ -108,6 +128,9 @@ int main() {
     test_vykresli_prazdny_seznam();
     test_vykresli_ukoly_hotovy_sede();
     test_vykresli_se_zpravou();
+    test_serializace_format();
+    test_parsovani_roundtrip();
+    test_parsovani_preskoci_prazdne_radky();
 
     std::cout << "Vsechny testy prosly.\n";
     return 0;
