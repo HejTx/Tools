@@ -222,6 +222,38 @@ void test_vytiskni_seznamy_uzka_obrazovka() {
         "         [2] Beta (0.0%)\n");
 }
 
+void test_vytiskni_prosly_cervene() {
+    // dnes = 19/07/26 -> klic 260719
+    std::ostringstream prosly;
+    vytiskniUkol(prosly, {1, "prosly", false, "18/07/26"}, "", 260719);
+    assert(prosly.str() ==
+        "\033[31mID: 1, Popis: prosly, Dokonceno: Ne, Termin: 18/07/26\033[0m\n");
+
+    std::ostringstream dnesni;
+    vytiskniUkol(dnesni, {2, "dnesni", false, "19/07/26"}, "", 260719);
+    assert(dnesni.str() == "ID: 2, Popis: dnesni, Dokonceno: Ne, Termin: 19/07/26\n");
+
+    std::ostringstream hotovy;  // hotovy prosly zustava sedy
+    vytiskniUkol(hotovy, {3, "hotovy", true, "18/07/26"}, "", 260719);
+    assert(hotovy.str() ==
+        "\033[90mID: 3, Popis: hotovy, Dokonceno: Ano, Termin: 18/07/26\033[0m\n");
+
+    std::ostringstream vypnuto;  // dnes = 0 -> kontrola vypnuta
+    vytiskniUkol(vypnuto, {4, "prosly", false, "18/07/26"});
+    assert(vypnuto.str() == "ID: 4, Popis: prosly, Dokonceno: Ne, Termin: 18/07/26\n");
+}
+
+void test_vykresli_s_proslym() {
+    StavSeznamu stav;
+    stav.seznamy = {{1, "Ukoly", {{1, "prosly", false, "18/07/26"}}}};
+    stav.aktivniId = 1;
+    std::ostringstream out;
+    vykresliObrazovku(out, stav, "", 80, 260719);
+    assert(out.str().find(
+        "\033[31mID: 1, Popis: prosly, Dokonceno: Ne, Termin: 18/07/26\033[0m\n")
+        != std::string::npos);
+}
+
 void test_vykresli_prehled() {
     StavSeznamu stav;
     stav.seznamy = {
@@ -774,6 +806,8 @@ int main() {
     test_vytiskni_seznamy();
     test_vytiskni_seznamy_zalamovani();
     test_vytiskni_seznamy_uzka_obrazovka();
+    test_vytiskni_prosly_cervene();
+    test_vykresli_s_proslym();
     test_vykresli_prehled();
     test_vykresli_prazdny_seznam();
     test_vykresli_ukoly_hotovy_sede();

@@ -381,18 +381,23 @@ inline std::optional<std::string> nactiObsahSouboru(const std::string& soubor) {
     return ss.str();
 }
 
-inline void vytiskniUkol(std::ostream& out, const Task& ukol, const std::string& prefixId = "") {
+// dnes = dnešní klíč (formát klicTerminu); 0 = kontrola prošlých vypnutá.
+inline void vytiskniUkol(std::ostream& out, const Task& ukol,
+                         const std::string& prefixId = "", int dnes = 0) {
+    bool prosly = !ukol.done && !ukol.termin.empty()
+                  && dnes != 0 && klicTerminu(ukol.termin) < dnes;
     if (ukol.done) out << "\033[90m";
+    else if (prosly) out << "\033[31m";
     out << "ID: " << prefixId << ukol.id << ", Popis: " << ukol.description
         << ", Dokonceno: " << (ukol.done ? "Ano" : "Ne");
     if (!ukol.termin.empty()) out << ", Termin: " << ukol.termin;
-    if (ukol.done) out << "\033[0m";
+    if (ukol.done || prosly) out << "\033[0m";
     out << "\n";
 }
 
-inline void vytiskniUkoly(std::ostream& out, const std::vector<Task>& ukoly) {
+inline void vytiskniUkoly(std::ostream& out, const std::vector<Task>& ukoly, int dnes = 0) {
     for (const auto& ukol : ukoly) {
-        vytiskniUkol(out, ukol);
+        vytiskniUkol(out, ukol, "", dnes);
     }
 }
 
@@ -682,7 +687,7 @@ inline void vytiskniSeznamy(std::ostream& out, const StavSeznamu& stav, int sirk
 inline void vykresliObrazovku(std::ostream& out,
                               const StavSeznamu& stav,
                               const std::string& zprava,
-                              int sirka = 80) {
+                              int sirka = 80, int dnes = 0) {
     vytiskniSeznamy(out, stav, sirka);
     const char* rezim = (stav.razeni == 2) ? "termin" : "ID";
     if (stav.aktivniId == 0) {
@@ -692,7 +697,7 @@ inline void vykresliObrazovku(std::ostream& out,
             out << "Zadne ukoly.\n";
         } else {
             for (const auto& polozka : polozky) {
-                vytiskniUkol(out, polozka.ukol, std::to_string(polozka.seznamId) + ".");
+                vytiskniUkol(out, polozka.ukol, std::to_string(polozka.seznamId) + ".", dnes);
             }
         }
     } else {
@@ -702,7 +707,7 @@ inline void vykresliObrazovku(std::ostream& out,
         if (ukoly.empty()) {
             out << "Zadne ukoly.\n";
         } else {
-            vytiskniUkoly(out, ukoly);
+            vytiskniUkoly(out, ukoly, dnes);
         }
     }
     out << "\n";

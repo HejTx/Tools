@@ -5,6 +5,7 @@
 #include <unistd.h>
 
 #include <cstdlib>
+#include <ctime>
 #include <filesystem>
 #include <set>
 
@@ -35,6 +36,14 @@ std::string cestaSeznamu(const std::string& adresar, const std::string& nazev) {
 std::string cestaNastaveni(const std::string& adresar) {
     if (adresar.empty()) return "nastaveni.txt";
     return adresar + "/nastaveni.txt";
+}
+
+// Dnešní datum jako klíč rr*10000+mm*100+dd (formát klicTerminu).
+int dnesniKlic() {
+    std::time_t ted = std::time(nullptr);
+    std::tm rozpad{};
+    localtime_r(&ted, &rozpad);
+    return (rozpad.tm_year % 100) * 10000 + (rozpad.tm_mon + 1) * 100 + rozpad.tm_mday;
 }
 
 // Šířka terminálu; mimo terminál (pipe) nebo při chybě 80.
@@ -352,7 +361,7 @@ int main() {
             posledniAktivni = najdiSeznam(stav.seznamy, stav.aktivniId)->nazev;
         }
         std::cout << "\033[2J\033[H";
-        vykresliObrazovku(std::cout, stav, zprava, sirkaTerminalu());
+        vykresliObrazovku(std::cout, stav, zprava, sirkaTerminalu(), dnesniKlic());
         if (!std::getline(std::cin, radek)) break;
 
         Prikaz prikaz = rozeberPrikaz(radek);
