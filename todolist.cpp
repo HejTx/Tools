@@ -141,8 +141,9 @@ int main() {
                 }
                 break;
             case TypPrikazu::Ulozit:
-                ulozSeznamy(stav, soubor, klic, sul);
-                zprava = "Ukoly ulozeny.";
+                zprava = ulozSeznamy(stav, soubor, klic, sul)
+                             ? "Ukoly ulozeny."
+                             : "CHYBA: Ulozeni se nezdarilo, zkus to znovu.";
                 break;
             case TypPrikazu::NovySeznam:
                 zprava = zkontrolujNazev(prikaz.popis);
@@ -202,7 +203,10 @@ int main() {
         if (prikaz.typ == TypPrikazu::Konec) break;
     }
 
-    ulozSeznamy(stav, soubor, klic, sul);
-    std::cout << "\nUkoly ulozeny. Nashledanou.\n";
-    return 0;
+    if (ulozSeznamy(stav, soubor, klic, sul)) {
+        std::cout << "\nUkoly ulozeny. Nashledanou.\n";
+        return 0;
+    }
+    std::cout << "\nPOZOR: Ukoly se nepodarilo ulozit!\n";
+    return 1;
 }

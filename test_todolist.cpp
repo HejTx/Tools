@@ -272,6 +272,26 @@ void test_neplatne_aktivni_id() {
     assert(stav.aktivniId == 3);  // neexistující ID -> první seznam
 }
 
+void test_uloz_seznamy_uspech_a_selhani() {
+    std::array<unsigned char, crypto_pwhash_SALTBYTES> sul;
+    randombytes_buf(sul.data(), sul.size());
+    std::vector<unsigned char> klic = odvodKlic("tajneheslo", sul.data());
+    StavSeznamu stav;
+    stav.seznamy = {{1, "Ukoly", {{1, "nakoupit", false}}}};
+    stav.aktivniId = 1;
+
+    const std::string soubor = "test_uloz_docasny.txt";
+    assert(ulozSeznamy(stav, soubor, klic, sul));
+    std::optional<std::string> obsah = nactiObsahSouboru(soubor);
+    assert(obsah && jeSifrovany(*obsah));
+    std::optional<VysledekDesifrovani> vysledek = desifruj(*obsah, "tajneheslo");
+    assert(vysledek && vysledek->plaintext == serializujSeznamy(stav));
+    std::remove(soubor.c_str());
+
+    // selhani: neexistujici adresar (hlaska na stderr je ocekavana)
+    assert(!ulozSeznamy(stav, "neexistujici_adresar/ukoly.txt", klic, sul));
+}
+
 void test_pridat_seznam() {
     StavSeznamu stav;
     stav.seznamy = {{1, "Ukoly", {}}};
@@ -418,6 +438,7 @@ int main() {
     test_migrace_stareho_formatu();
     test_parsovani_prazdneho_obsahu();
     test_neplatne_aktivni_id();
+    test_uloz_seznamy_uspech_a_selhani();
     test_pridat_seznam();
     test_vybrat_seznam();
     test_prejmenovat_seznam();

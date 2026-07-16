@@ -199,7 +199,8 @@ inline bool smazatSeznam(StavSeznamu& stav, int id) {
 
 // Uloží všechny seznamy zašifrovaně (stejný klíč a sůl, nová nonce při každém zápisu).
 // Zapisuje přes dočasný soubor a rename, aby selhání zápisu nezničilo původní data.
-inline void ulozSeznamy(const StavSeznamu& stav, const std::string& soubor,
+// Vrací false, když se zápis nezdařil (původní soubor zůstává nedotčen).
+inline bool ulozSeznamy(const StavSeznamu& stav, const std::string& soubor,
                         const std::vector<unsigned char>& klic,
                         const std::array<unsigned char, crypto_pwhash_SALTBYTES>& sul) {
     const std::string docasny = soubor + ".tmp";
@@ -207,7 +208,7 @@ inline void ulozSeznamy(const StavSeznamu& stav, const std::string& soubor,
     std::ofstream out(docasny, std::ios::binary);
     if (!out) {
         std::cerr << "Nepodarilo se otevrit soubor pro zapis: " << docasny << "\n";
-        return;
+        return false;
     }
 
     out << zasifruj(serializujSeznamy(stav), klic, sul);
@@ -216,14 +217,16 @@ inline void ulozSeznamy(const StavSeznamu& stav, const std::string& soubor,
         std::cerr << "Zapis do souboru " << docasny << " se nezdaril, puvodni data zustavaji.\n";
         out.close();
         std::remove(docasny.c_str());
-        return;
+        return false;
     }
     out.close();
 
     if (std::rename(docasny.c_str(), soubor.c_str()) != 0) {
         std::cerr << "Nepodarilo se prejmenovat " << docasny << " na " << soubor << ".\n";
         std::remove(docasny.c_str());
+        return false;
     }
+    return true;
 }
 
 // Přečte celý soubor jako syrové bajty. nullopt = soubor nejde otevřít.
