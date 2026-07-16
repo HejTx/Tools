@@ -485,6 +485,14 @@ void test_serazene_ukoly() {
     assert(podleTerminu[0].id == 3);  // nejblizsi termin prvni
     assert(podleTerminu[1].id == 2);
     assert(podleTerminu[2].id == 1);  // bez terminu nakonec
+
+    // hotove nakonec, i kdyz maji nejblizsi termin
+    std::vector<Task> sHotovym = {{1, "hotovy blizky", true, "01/01/26"},
+                                  {2, "nehotovy pozdejsi", false, "20/08/26"},
+                                  {3, "hotovy pozdni", true, "31/12/26"}};
+    std::vector<Task> serazene = serazeneUkoly(sHotovym, 2);
+    assert(serazene[0].id == 2);                        // nehotovy prvni
+    assert(serazene[1].id == 1 && serazene[2].id == 3); // hotove podle terminu
 }
 
 void test_sestav_prehled() {
@@ -503,6 +511,10 @@ void test_sestav_prehled() {
     assert(podleTerminu[0].seznamId == 2);              // 18/07 prvni
     assert(podleTerminu[1].ukol.termin == "20/08/26");
     assert(podleTerminu[2].ukol.termin == "");          // bez terminu nakonec
+
+    stav.seznamy[0].ukoly.push_back({3, "hotovy blizky", true, "01/01/26"});
+    std::vector<PolozkaPrehledu> sHotovym = sestavPrehled(stav);
+    assert(sHotovym.back().ukol.id == 3);               // hotovy az nakonec
 }
 
 void test_serializace_zamceneho() {

@@ -285,6 +285,7 @@ inline std::vector<Task> serazeneUkoly(const std::vector<Task>& ukoly, int razen
     std::vector<Task> vysledek = ukoly;
     if (razeni == 2) {
         std::stable_sort(vysledek.begin(), vysledek.end(), [](const Task& a, const Task& b) {
+            if (a.done != b.done) return !a.done;  // hotove nakonec
             if (klicTerminu(a.termin) != klicTerminu(b.termin)) {
                 return klicTerminu(a.termin) < klicTerminu(b.termin);
             }
@@ -311,6 +312,7 @@ inline std::vector<PolozkaPrehledu> sestavPrehled(const StavSeznamu& stav) {
     if (stav.razeni == 2) {
         std::stable_sort(polozky.begin(), polozky.end(),
                          [](const PolozkaPrehledu& a, const PolozkaPrehledu& b) {
+            if (a.ukol.done != b.ukol.done) return !a.ukol.done;  // hotove nakonec
             if (klicTerminu(a.ukol.termin) != klicTerminu(b.ukol.termin)) {
                 return klicTerminu(a.ukol.termin) < klicTerminu(b.ukol.termin);
             }
