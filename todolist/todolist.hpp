@@ -16,7 +16,8 @@ struct Task {
     int id;
     std::string description;
     bool done = false;
-    std::string termin;  // dd/mm/yy, prázdný = bez termínu
+    std::string termin;   // dd/mm/yy, prázdný = bez termínu
+    int priorita = 2;     // 1 vysoká, 2 normální, 3 nízká
 };
 
 // Formát dd/mm/yy: číslice + lomítka, den 01-31, měsíc 01-12.
@@ -96,7 +97,8 @@ inline std::string formatujProcenta(const std::vector<Task>& ukoly) {
 inline std::string serializujUkoly(const std::vector<Task>& ukoly) {
     std::ostringstream out;
     for (const auto& ukol : ukoly) {
-        out << ukol.id << ";" << ukol.description << ";" << ukol.done << ";" << ukol.termin << "\n";
+        out << ukol.id << ";" << ukol.description << ";" << ukol.done << ";" << ukol.termin
+            << ";" << ukol.priorita << "\n";
     }
     return out.str();
 }
@@ -110,12 +112,13 @@ inline std::vector<Task> parsujUkoly(const std::string& obsah) {
         if (line.empty()) continue;
 
         std::istringstream ss(line);
-        std::string idStr, description, doneStr, terminStr;
+        std::string idStr, description, doneStr, terminStr, prioritaStr;
 
         std::getline(ss, idStr, ';');
         std::getline(ss, description, ';');
         std::getline(ss, doneStr, ';');
-        std::getline(ss, terminStr, ';');  // starý 3-polový řádek -> prázdný termín
+        std::getline(ss, terminStr, ';');    // starý 3-polový řádek -> prázdný termín
+        std::getline(ss, prioritaStr, ';');  // starý 4-polový řádek -> priorita 2
 
         Task ukol;
         try {
@@ -126,6 +129,12 @@ inline std::vector<Task> parsujUkoly(const std::string& obsah) {
         ukol.description = description;
         ukol.done = (doneStr == "1");
         ukol.termin = terminStr;
+        try {
+            ukol.priorita = std::stoi(prioritaStr);
+        } catch (...) {
+            ukol.priorita = 2;
+        }
+        if (ukol.priorita < 1 || ukol.priorita > 3) ukol.priorita = 2;
 
         ukoly.push_back(ukol);
     }
@@ -452,6 +461,17 @@ inline bool nastavTermin(std::vector<Task>& ukoly, int id, const std::string& te
     for (auto& ukol : ukoly) {
         if (ukol.id == id) {
             ukol.termin = termin;
+            return true;
+        }
+    }
+    return false;
+}
+
+// Nastaví prioritu úkolu (1 vysoká, 2 normální, 3 nízká).
+inline bool nastavPrioritu(std::vector<Task>& ukoly, int id, int priorita) {
+    for (auto& ukol : ukoly) {
+        if (ukol.id == id) {
+            ukol.priorita = priorita;
             return true;
         }
     }

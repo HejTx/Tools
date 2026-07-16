@@ -335,7 +335,7 @@ void test_procenta() {
 
 void test_serializace_format() {
     std::vector<Task> ukoly = {{1, "nakoupit", true}, {2, "uklidit", false}};
-    assert(serializujUkoly(ukoly) == "1;nakoupit;1;\n2;uklidit;0;\n");
+    assert(serializujUkoly(ukoly) == "1;nakoupit;1;;2\n2;uklidit;0;;2\n");
     assert(serializujUkoly({}) == "");
 }
 
@@ -364,12 +364,28 @@ void test_klic_terminu() {
 
 void test_serializace_terminu() {
     std::vector<Task> ukoly = {{1, "a", false, "18/07/26"}, {2, "b", true}};
-    assert(serializujUkoly(ukoly) == "1;a;0;18/07/26\n2;b;1;\n");
+    assert(serializujUkoly(ukoly) == "1;a;0;18/07/26;2\n2;b;1;;2\n");
     std::vector<Task> zpet = parsujUkoly(serializujUkoly(ukoly));
     assert(zpet[0].termin == "18/07/26" && zpet[1].termin == "");
     // stary 3-polovy format -> bez terminu
     std::vector<Task> stare = parsujUkoly("1;nakoupit;1\n");
     assert(stare[0].termin == "" && stare[0].done);
+}
+
+void test_priorita_serializace_a_nastaveni() {
+    std::vector<Task> ukoly = {{1, "a", false, "18/07/26", 1}, {2, "b", false}};
+    assert(serializujUkoly(ukoly) == "1;a;0;18/07/26;1\n2;b;0;;2\n");
+    std::vector<Task> zpet = parsujUkoly(serializujUkoly(ukoly));
+    assert(zpet[0].priorita == 1 && zpet[1].priorita == 2);
+    // stare formaty a nesmysly -> 2
+    assert(parsujUkoly("1;a;0;18/07/26\n")[0].priorita == 2);
+    assert(parsujUkoly("1;a;0\n")[0].priorita == 2);
+    assert(parsujUkoly("1;a;0;;9\n")[0].priorita == 2);
+    assert(parsujUkoly("1;a;0;;x\n")[0].priorita == 2);
+
+    assert(nastavPrioritu(ukoly, 2, 3));
+    assert(ukoly[1].priorita == 3);
+    assert(!nastavPrioritu(ukoly, 99, 1));
 }
 
 void test_vytiskni_ukol_s_terminem() {
@@ -412,8 +428,8 @@ void test_serializace_seznamu() {
         "@aktivni;2\n"
         "@razeni;1\n"
         "#seznam;1;Nakup\n"
-        "1;mleko;0;\n"
-        "2;chleba;1;\n"
+        "1;mleko;0;;2\n"
+        "2;chleba;1;;2\n"
         "#seznam;2;Prace\n");
 }
 
@@ -818,6 +834,7 @@ int main() {
     test_klic_terminu();
     test_serializace_terminu();
     test_vytiskni_ukol_s_terminem();
+    test_priorita_serializace_a_nastaveni();
     test_parsovani_roundtrip();
     test_parsovani_preskoci_prazdne_radky();
     test_parsovani_preskoci_poskozeny_radek();
