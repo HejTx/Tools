@@ -139,6 +139,32 @@ void test_razeni_prikaz() {
     assert(rozeberPrikaz("z").typ == TypPrikazu::PrepnoutRazeni);
 }
 
+void test_priorita_prikaz() {
+    Prikaz p = rozeberPrikaz("pr 3 1");
+    assert(p.typ == TypPrikazu::Priorita && p.id == 3 && p.popis == "1");
+    Prikaz slozeny = rozeberPrikaz("pr 2.3 1");
+    assert(slozeny.typ == TypPrikazu::Priorita && slozeny.seznamUkolu == 2 && slozeny.id == 3);
+    Prikaz reset = rozeberPrikaz("pr 3");
+    assert(reset.typ == TypPrikazu::Priorita && reset.popis == "");
+    assert(rozeberPrikaz("pr").typ == TypPrikazu::Neznamy);
+}
+
+void test_priorita_tiebreaker() {
+    std::vector<Task> ukoly = {{1, "nizka", false, "18/07/26", 3},
+                               {2, "vysoka", false, "18/07/26", 1},
+                               {3, "normalni", false, "18/07/26"}};
+    std::vector<Task> serazene = serazeneUkoly(ukoly, 2);
+    assert(serazene[0].id == 2 && serazene[1].id == 3 && serazene[2].id == 1);
+    // rezim 1 prioritu ignoruje
+    assert(serazeneUkoly(ukoly, 1)[0].id == 1);
+
+    StavSeznamu stav;
+    stav.seznamy = {{1, "A", {{1, "nizka", false, "18/07/26", 3}}},
+                    {2, "B", {{1, "vysoka", false, "18/07/26", 1}}}};
+    stav.razeni = 2;
+    assert(sestavPrehled(stav)[0].seznamId == 2);  // vysoka prvni pri stejnem terminu
+}
+
 void test_napoveda_prikaz() {
     assert(rozeberPrikaz("h").typ == TypPrikazu::Napoveda);
     assert(rozeberPrikaz("h cokoli").typ == TypPrikazu::Napoveda);  // zbytek se ignoruje
@@ -816,6 +842,8 @@ int main() {
     test_slozene_id();
     test_termin_prikaz();
     test_razeni_prikaz();
+    test_priorita_prikaz();
+    test_priorita_tiebreaker();
     test_napoveda_prikaz();
     test_neznamy_prikaz();
     test_vytiskni_napovedu();

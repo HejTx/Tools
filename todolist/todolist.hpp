@@ -298,6 +298,7 @@ inline std::vector<Task> serazeneUkoly(const std::vector<Task>& ukoly, int razen
             if (klicTerminu(a.termin) != klicTerminu(b.termin)) {
                 return klicTerminu(a.termin) < klicTerminu(b.termin);
             }
+            if (a.priorita != b.priorita) return a.priorita < b.priorita;
             return a.id < b.id;
         });
     }
@@ -325,6 +326,7 @@ inline std::vector<PolozkaPrehledu> sestavPrehled(const StavSeznamu& stav) {
             if (klicTerminu(a.ukol.termin) != klicTerminu(b.ukol.termin)) {
                 return klicTerminu(a.ukol.termin) < klicTerminu(b.ukol.termin);
             }
+            if (a.ukol.priorita != b.ukol.priorita) return a.ukol.priorita < b.ukol.priorita;
             if (a.seznamId != b.seznamId) return a.seznamId < b.seznamId;
             return a.ukol.id < b.ukol.id;
         });
@@ -492,7 +494,7 @@ inline bool upravitUkol(std::vector<Task>& ukoly, int id, const std::string& pop
 enum class TypPrikazu { Pridat, Oznacit, Odebrat, Konec, Neznamy, Ulozit,
                         NovySeznam, VybratSeznam, PrejmenovatSeznam, SmazatSeznam,
                         Napoveda, UpravitUkol, PresunoutUkol, VycistitHotove,
-                        Zpet, ZmenaHesla, Termin, PrepnoutRazeni };
+                        Zpet, ZmenaHesla, Termin, PrepnoutRazeni, Priorita };
 
 struct Prikaz {
     TypPrikazu typ = TypPrikazu::Neznamy;
@@ -574,6 +576,11 @@ inline Prikaz rozeberPrikaz(const std::string& radek) {
         }
     } else if (token == "t") {
         prikaz.typ = TypPrikazu::Termin;
+        if (nactiUkolId(ss, prikaz)) {
+            prikaz.popis = zbytekRadku(ss);
+        }
+    } else if (token == "pr") {
+        prikaz.typ = TypPrikazu::Priorita;
         if (nactiUkolId(ss, prikaz)) {
             prikaz.popis = zbytekRadku(ss);
         }
