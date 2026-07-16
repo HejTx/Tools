@@ -254,8 +254,46 @@ void test_procenta() {
 
 void test_serializace_format() {
     std::vector<Task> ukoly = {{1, "nakoupit", true}, {2, "uklidit", false}};
-    assert(serializujUkoly(ukoly) == "1;nakoupit;1\n2;uklidit;0\n");
+    assert(serializujUkoly(ukoly) == "1;nakoupit;1;\n2;uklidit;0;\n");
     assert(serializujUkoly({}) == "");
+}
+
+void test_platny_termin() {
+    assert(jePlatnyTermin("18/07/26"));
+    assert(jePlatnyTermin("01/01/00"));
+    assert(!jePlatnyTermin(""));
+    assert(!jePlatnyTermin("18/7/26"));
+    assert(!jePlatnyTermin("18-07-26"));
+    assert(!jePlatnyTermin("32/07/26"));
+    assert(!jePlatnyTermin("18/13/26"));
+    assert(!jePlatnyTermin("00/07/26"));
+    assert(!jePlatnyTermin("aa/bb/cc"));
+}
+
+void test_klic_terminu() {
+    assert(klicTerminu("18/07/26") == 260718);
+    assert(klicTerminu("19/07/26") > klicTerminu("18/07/26"));
+    assert(klicTerminu("01/01/27") > klicTerminu("31/12/26"));
+    assert(klicTerminu("") > klicTerminu("31/12/99"));  // bez terminu nakonec
+}
+
+void test_serializace_terminu() {
+    std::vector<Task> ukoly = {{1, "a", false, "18/07/26"}, {2, "b", true}};
+    assert(serializujUkoly(ukoly) == "1;a;0;18/07/26\n2;b;1;\n");
+    std::vector<Task> zpet = parsujUkoly(serializujUkoly(ukoly));
+    assert(zpet[0].termin == "18/07/26" && zpet[1].termin == "");
+    // stary 3-polovy format -> bez terminu
+    std::vector<Task> stare = parsujUkoly("1;nakoupit;1\n");
+    assert(stare[0].termin == "" && stare[0].done);
+}
+
+void test_vytiskni_ukol_s_terminem() {
+    std::ostringstream out;
+    vytiskniUkol(out, {1, "mleko", false, "18/07/26"});
+    assert(out.str() == "ID: 1, Popis: mleko, Dokonceno: Ne, Termin: 18/07/26\n");
+    std::ostringstream out2;
+    vytiskniUkol(out2, {2, "chleba", false}, "3.");
+    assert(out2.str() == "ID: 3.2, Popis: chleba, Dokonceno: Ne\n");
 }
 
 void test_parsovani_roundtrip() {
@@ -288,8 +326,8 @@ void test_serializace_seznamu() {
     assert(serializujSeznamy(stav) ==
         "@aktivni;2\n"
         "#seznam;1;Nakup\n"
-        "1;mleko;0\n"
-        "2;chleba;1\n"
+        "1;mleko;0;\n"
+        "2;chleba;1;\n"
         "#seznam;2;Prace\n");
 }
 
@@ -526,6 +564,10 @@ int main() {
     test_vykresli_se_zpravou();
     test_procenta();
     test_serializace_format();
+    test_platny_termin();
+    test_klic_terminu();
+    test_serializace_terminu();
+    test_vytiskni_ukol_s_terminem();
     test_parsovani_roundtrip();
     test_parsovani_preskoci_prazdne_radky();
     test_parsovani_preskoci_poskozeny_radek();

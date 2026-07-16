@@ -2,6 +2,7 @@ CXX = g++
 LDLIBS = -lsodium
 
 all: todolist.exe
+	@:
 
 todolist.exe: todolist.cpp todolist.hpp sifrovani.hpp
 	$(CXX) todolist.cpp -o $@ $(LDLIBS)

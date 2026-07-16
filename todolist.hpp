@@ -6,7 +6,9 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
+#include <limits>
 
 #include "sifrovani.hpp"
 
@@ -14,7 +16,28 @@ struct Task {
     int id;
     std::string description;
     bool done = false;
+    std::string termin;  // dd/mm/yy, prázdný = bez termínu
 };
+
+// Formát dd/mm/yy: číslice + lomítka, den 01-31, měsíc 01-12.
+inline bool jePlatnyTermin(const std::string& termin) {
+    if (termin.size() != 8 || termin[2] != '/' || termin[5] != '/') return false;
+    for (size_t i : {0, 1, 3, 4, 6, 7}) {
+        if (!std::isdigit(static_cast<unsigned char>(termin[i]))) return false;
+    }
+    int den = std::stoi(termin.substr(0, 2));
+    int mesic = std::stoi(termin.substr(3, 2));
+    return den >= 1 && den <= 31 && mesic >= 1 && mesic <= 12;
+}
+
+// Porovnávací klíč rr*10000+mm*100+dd; bez termínu = max (řadí se nakonec).
+inline int klicTerminu(const std::string& termin) {
+    if (termin.empty()) return std::numeric_limits<int>::max();
+    int den = std::stoi(termin.substr(0, 2));
+    int mesic = std::stoi(termin.substr(3, 2));
+    int rok = std::stoi(termin.substr(6, 2));
+    return rok * 10000 + mesic * 100 + den;
+}
 
 // Podíl hotových úkolů jako "50.0%"; prázdný seznam = "0.0%".
 inline std::string formatujProcenta(const std::vector<Task>& ukoly) {
@@ -31,7 +54,7 @@ inline std::string formatujProcenta(const std::vector<Task>& ukoly) {
 inline std::string serializujUkoly(const std::vector<Task>& ukoly) {
     std::ostringstream out;
     for (const auto& ukol : ukoly) {
-        out << ukol.id << ";" << ukol.description << ";" << ukol.done << "\n";
+        out << ukol.id << ";" << ukol.description << ";" << ukol.done << ";" << ukol.termin << "\n";
     }
     return out.str();
 }
@@ -45,11 +68,12 @@ inline std::vector<Task> parsujUkoly(const std::string& obsah) {
         if (line.empty()) continue;
 
         std::istringstream ss(line);
-        std::string idStr, description, doneStr;
+        std::string idStr, description, doneStr, terminStr;
 
         std::getline(ss, idStr, ';');
         std::getline(ss, description, ';');
         std::getline(ss, doneStr, ';');
+        std::getline(ss, terminStr, ';');  // starý 3-polový řádek -> prázdný termín
 
         Task ukol;
         try {
@@ -59,6 +83,7 @@ inline std::vector<Task> parsujUkoly(const std::string& obsah) {
         }
         ukol.description = description;
         ukol.done = (doneStr == "1");
+        ukol.termin = terminStr;
 
         ukoly.push_back(ukol);
     }
@@ -256,10 +281,11 @@ inline std::optional<std::string> nactiObsahSouboru(const std::string& soubor) {
     return ss.str();
 }
 
-inline void vytiskniUkol(std::ostream& out, const Task& ukol) {
+inline void vytiskniUkol(std::ostream& out, const Task& ukol, const std::string& prefixId = "") {
     if (ukol.done) out << "\033[90m";
-    out << "ID: " << ukol.id << ", Popis: " << ukol.description
+    out << "ID: " << prefixId << ukol.id << ", Popis: " << ukol.description
         << ", Dokonceno: " << (ukol.done ? "Ano" : "Ne");
+    if (!ukol.termin.empty()) out << ", Termin: " << ukol.termin;
     if (ukol.done) out << "\033[0m";
     out << "\n";
 }
