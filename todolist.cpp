@@ -150,6 +150,23 @@ int main() {
     std::string radek;
     std::string zprava;
     std::optional<StavSeznamu> predchozi;
+
+    // Cílový seznam úkolového příkazu: složené ID > aktivní seznam; v přehledu
+    // 0 je složené ID povinné. Při neúspěchu nastaví zprávu a vrátí nullptr.
+    auto najdiCilUkolu = [&stav](const Prikaz& prikaz, std::string& zprava) -> Seznam* {
+        if (prikaz.seznamUkolu != -1) {
+            Seznam* seznam = najdiSeznam(stav.seznamy, prikaz.seznamUkolu);
+            if (!seznam) {
+                zprava = "Seznam s ID " + std::to_string(prikaz.seznamUkolu) + " nenalezen.";
+            }
+            return seznam;
+        }
+        if (stav.aktivniId == 0) {
+            zprava = "V prehledu pouzij ID ve tvaru <seznam>.<ukol>, napr. o 2.3.";
+            return nullptr;
+        }
+        return najdiSeznam(stav.seznamy, stav.aktivniId);
+    };
     while (true) {
         std::cout << "\033[2J\033[H";
         vykresliObrazovku(std::cout, stav, zprava, sirkaTerminalu());
@@ -170,41 +187,71 @@ int main() {
         // větvích — příkazy nad seznamy (push_back/erase) by ho zneplatnily.
         switch (prikaz.typ) {
             case TypPrikazu::Pridat:
-                if (prikaz.popis.find(';') != std::string::npos) {
+                if (stav.aktivniId == 0) {
+                    zprava = "V prehledu nelze pridavat, prepni na seznam.";
+                } else if (prikaz.popis.find(';') != std::string::npos) {
                     zprava = "Popis nesmi obsahovat znak ';'.";
                 } else {
                     pridatUkol(najdiSeznam(stav.seznamy, stav.aktivniId)->ukoly, prikaz.popis);
                     zprava = "Ukol pridan.";
                 }
                 break;
-            case TypPrikazu::Oznacit:
-                if (oznacitUkolDokonceny(najdiSeznam(stav.seznamy, stav.aktivniId)->ukoly, prikaz.id)) {
+            case TypPrikazu::Oznacit: {
+                Seznam* cil = najdiCilUkolu(prikaz, zprava);
+                if (!cil) break;
+                if (oznacitUkolDokonceny(cil->ukoly, prikaz.id)) {
                     zprava = "Ukol " + std::to_string(prikaz.id) + " oznacen jako hotovy.";
                 } else {
                     zprava = "Ukol s ID " + std::to_string(prikaz.id) + " nenalezen.";
                 }
                 break;
-            case TypPrikazu::Odebrat:
-                if (odebratUkol(najdiSeznam(stav.seznamy, stav.aktivniId)->ukoly, prikaz.id)) {
+            }
+            case TypPrikazu::Odebrat: {
+                Seznam* cil = najdiCilUkolu(prikaz, zprava);
+                if (!cil) break;
+                if (odebratUkol(cil->ukoly, prikaz.id)) {
                     zprava = "Ukol " + std::to_string(prikaz.id) + " odebran.";
                 } else {
                     zprava = "Ukol s ID " + std::to_string(prikaz.id) + " nenalezen.";
                 }
                 break;
-            case TypPrikazu::UpravitUkol:
+            }
+            case TypPrikazu::UpravitUkol: {
+                Seznam* cil = najdiCilUkolu(prikaz, zprava);
+                if (!cil) break;
                 if (prikaz.popis.empty()) {
                     zprava = "Popis nesmi byt prazdny.";
                 } else if (prikaz.popis.find(';') != std::string::npos) {
                     zprava = "Popis nesmi obsahovat znak ';'.";
-                } else if (upravitUkol(najdiSeznam(stav.seznamy, stav.aktivniId)->ukoly,
-                                       prikaz.id, prikaz.popis)) {
+                } else if (upravitUkol(cil->ukoly, prikaz.id, prikaz.popis)) {
                     zprava = "Ukol upraven.";
                 } else {
                     zprava = "Ukol s ID " + std::to_string(prikaz.id) + " nenalezen.";
                 }
                 break;
-            case TypPrikazu::PresunoutUkol:
-                switch (presunUkol(stav, stav.aktivniId, prikaz.id, prikaz.id2)) {
+            }
+            case TypPrikazu::Termin: {
+                Seznam* cil = najdiCilUkolu(prikaz, zprava);
+                if (!cil) break;
+                if (!prikaz.popis.empty() && !jePlatnyTermin(prikaz.popis)) {
+                    zprava = "Neplatny format terminu, pouzij dd/mm/yy.";
+                } else if (!nastavTermin(cil->ukoly, prikaz.id, prikaz.popis)) {
+                    zprava = "Ukol s ID " + std::to_string(prikaz.id) + " nenalezen.";
+                } else {
+                    zprava = prikaz.popis.empty() ? "Termin odstranen."
+                                                  : "Termin nastaven na " + prikaz.popis + ".";
+                }
+                break;
+            }
+            case TypPrikazu::PrepnoutRazeni:
+                stav.razeni = (stav.razeni == 2) ? 1 : 2;
+                zprava = (stav.razeni == 2) ? "Razeni: podle terminu." : "Razeni: podle ID.";
+                break;
+            case TypPrikazu::PresunoutUkol: {
+                Seznam* zdroj = najdiCilUkolu(prikaz, zprava);
+                if (!zdroj) break;
+                int zdrojId = (prikaz.seznamUkolu != -1) ? prikaz.seznamUkolu : stav.aktivniId;
+                switch (presunUkol(stav, zdrojId, prikaz.id, prikaz.id2)) {
                     case 0:
                         zprava = "Ukol presunut do seznamu '"
                                  + najdiSeznam(stav.seznamy, prikaz.id2)->nazev + "'.";
@@ -216,12 +263,20 @@ int main() {
                         zprava = "Seznam s ID " + std::to_string(prikaz.id2) + " nenalezen.";
                         break;
                     default:
-                        zprava = "Ukol uz je v aktivnim seznamu.";
+                        zprava = "Ukol uz je v tomto seznamu.";
                         break;
                 }
                 break;
+            }
             case TypPrikazu::VycistitHotove: {
-                int pocet = vycistiHotove(najdiSeznam(stav.seznamy, stav.aktivniId)->ukoly);
+                int pocet = 0;
+                if (stav.aktivniId == 0) {
+                    for (auto& seznam : stav.seznamy) {
+                        pocet += vycistiHotove(seznam.ukoly);
+                    }
+                } else {
+                    pocet = vycistiHotove(najdiSeznam(stav.seznamy, stav.aktivniId)->ukoly);
+                }
                 zprava = (pocet == 0)
                              ? "Zadne hotove ukoly k odstraneni."
                              : "Odstraneno hotovych ukolu: " + std::to_string(pocet) + ".";
@@ -241,8 +296,10 @@ int main() {
                 break;
             case TypPrikazu::VybratSeznam:
                 if (vybratSeznam(stav, prikaz.id)) {
-                    zprava = "Prepnuto na seznam '"
-                             + najdiSeznam(stav.seznamy, stav.aktivniId)->nazev + "'.";
+                    zprava = (stav.aktivniId == 0)
+                                 ? "Prepnuto na prehled 'Vse'."
+                                 : "Prepnuto na seznam '"
+                                   + najdiSeznam(stav.seznamy, stav.aktivniId)->nazev + "'.";
                 } else {
                     zprava = "Seznam s ID " + std::to_string(prikaz.id) + " nenalezen.";
                 }
@@ -259,6 +316,10 @@ int main() {
                 }
                 break;
             case TypPrikazu::SmazatSeznam: {
+                if (prikaz.id == -1 && stav.aktivniId == 0) {
+                    zprava = "V prehledu neni aktivni seznam ke smazani.";
+                    break;
+                }
                 int cil = (prikaz.id == -1) ? stav.aktivniId : prikaz.id;
                 const Seznam* mazany = najdiSeznam(stav.seznamy, cil);
                 if (mazany) {
