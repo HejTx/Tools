@@ -136,8 +136,22 @@ bool migrujStaryFormat(const std::string& staraCesta, const std::string& adresar
     }
 
     StavSeznamu stary = parsujSeznamy(plaintext);
+    // Staré názvy nemusely být unikátní ani bezpečné pro souborový systém
+    // (dřív se povolovalo '/' i tečka na začátku) — sanitizace + deduplikace.
+    std::set<std::string> pouzite;
     int vytvoreno = 0;
     for (auto& seznam : stary.seznamy) {
+        for (auto& znak : seznam.nazev) {
+            if (znak == '/') znak = '_';
+        }
+        if (seznam.nazev.empty()) seznam.nazev = "Seznam";
+        if (seznam.nazev[0] == '.') seznam.nazev[0] = '_';
+        std::string zaklad = seznam.nazev;
+        for (int poradi = 2; pouzite.count(seznam.nazev) > 0; ++poradi) {
+            seznam.nazev = zaklad + " (" + std::to_string(poradi) + ")";
+        }
+        pouzite.insert(seznam.nazev);
+
         randombytes_buf(seznam.sul.data(), seznam.sul.size());
         seznam.klic = odvodKlic(*heslo, seznam.sul.data());
         if (!ulozSeznamDoSouboru(seznam, cestaSeznamu(adresar, seznam.nazev))) {
@@ -208,7 +222,13 @@ int main() {
     stav.seznamy = std::move(pahyly);
     stav.razeni = nastaveni.razeni;
 
-    // volba prvního seznamu (jméno -> heslo; neexistující -> založení)
+    // volba prvního seznamu (jméno -> heslo; neexistující -> založení);
+    // předvyplňuje se jen název, který na disku pořád existuje
+    bool posledniExistuje = false;
+    for (const auto& seznam : stav.seznamy) {
+        if (seznam.nazev == nastaveni.posledni) posledniExistuje = true;
+    }
+    if (!posledniExistuje) nastaveni.posledni.clear();
     while (true) {
         std::string vyzva = nastaveni.posledni.empty()
                                 ? "Seznam: "
@@ -286,12 +306,16 @@ int main() {
                 ok = false;
             }
         }
-        for (const auto& nazev : odemceneNazvy) {
-            bool existuje = false;
-            for (const auto& seznam : stav.seznamy) {
-                if (seznam.nazev == nazev) existuje = true;
+        // Soubory odstraněných/přejmenovaných seznamů se mažou jen po úspěšném
+        // zápisu všech trezorů — jinak by selhané přejmenování přišlo o data.
+        if (ok) {
+            for (const auto& nazev : odemceneNazvy) {
+                bool existuje = false;
+                for (const auto& seznam : stav.seznamy) {
+                    if (seznam.nazev == nazev) existuje = true;
+                }
+                if (!existuje) std::remove(cestaSeznamu(adresar, nazev).c_str());
             }
-            if (!existuje) std::remove(cestaSeznamu(adresar, nazev).c_str());
         }
         nastaveni.razeni = stav.razeni;
         if (!posledniAktivni.empty()) nastaveni.posledni = posledniAktivni;
@@ -498,8 +522,12 @@ int main() {
                     }
                     std::optional<std::string> obsah =
                         nactiObsahSouboru(cestaSeznamu(adresar, cil->nazev));
-                    std::optional<VysledekDesifrovani> vysledek =
-                        obsah ? desifruj(*obsah, *heslo) : std::nullopt;
+                    if (!obsah) {
+                        sodium_memzero(heslo->data(), heslo->size());
+                        zprava = "Soubor seznamu nelze precist.";
+                        break;
+                    }
+                    std::optional<VysledekDesifrovani> vysledek = desifruj(*obsah, *heslo);
                     sodium_memzero(heslo->data(), heslo->size());
                     if (!vysledek) {
                         zprava = "Spatne heslo.";
