@@ -204,7 +204,7 @@ int main() {
                 }
                 break;
             case TypPrikazu::PresunoutUkol:
-                switch (presunUkol(stav, prikaz.id, prikaz.id2)) {
+                switch (presunUkol(stav, stav.aktivniId, prikaz.id, prikaz.id2)) {
                     case 0:
                         zprava = "Ukol presunut do seznamu '"
                                  + najdiSeznam(stav.seznamy, prikaz.id2)->nazev + "'.";

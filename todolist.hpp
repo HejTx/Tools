@@ -190,7 +190,7 @@ inline StavSeznamu parsujSeznamy(const std::string& obsah) {
     if (stav.seznamy.empty()) {
         stav.seznamy.push_back({1, "Ukoly", {}});
     }
-    if (najdiSeznam(stav.seznamy, stav.aktivniId) == nullptr) {
+    if (stav.aktivniId != 0 && najdiSeznam(stav.seznamy, stav.aktivniId) == nullptr) {
         stav.aktivniId = stav.seznamy.front().id;
     }
     if (stav.razeni != 2) stav.razeni = 1;
@@ -206,7 +206,7 @@ inline int pridatSeznam(StavSeznamu& stav, const std::string& nazev) {
 }
 
 inline bool vybratSeznam(StavSeznamu& stav, int id) {
-    if (najdiSeznam(stav.seznamy, id) == nullptr) return false;
+    if (id != 0 && najdiSeznam(stav.seznamy, id) == nullptr) return false;  // 0 = přehled Vše
     stav.aktivniId = id;
     return true;
 }
@@ -228,8 +228,8 @@ inline bool smazatSeznam(StavSeznamu& stav, int id) {
 
     if (stav.seznamy.empty()) {
         stav.seznamy.push_back({1, "Ukoly", {}});
-        stav.aktivniId = 1;
-    } else if (najdiSeznam(stav.seznamy, stav.aktivniId) == nullptr) {
+        if (stav.aktivniId != 0) stav.aktivniId = 1;
+    } else if (stav.aktivniId != 0 && najdiSeznam(stav.seznamy, stav.aktivniId) == nullptr) {
         stav.aktivniId = stav.seznamy.front().id;
     }
     return true;
@@ -275,18 +275,19 @@ inline std::vector<PolozkaPrehledu> sestavPrehled(const StavSeznamu& stav) {
     return polozky;
 }
 
-// Přesune úkol z aktivního seznamu do cílového; v cíli dostane nové ID.
-// 0 = OK, 1 = úkol nenalezen, 2 = cílový seznam neexistuje, 3 = cíl je aktivní.
-inline int presunUkol(StavSeznamu& stav, int ukolId, int cilId) {
-    Seznam* aktivni = najdiSeznam(stav.seznamy, stav.aktivniId);
-    auto it = std::find_if(aktivni->ukoly.begin(), aktivni->ukoly.end(),
+// Přesune úkol ze zdrojového seznamu do cílového; v cíli dostane nové ID.
+// 0 = OK, 1 = úkol (či zdroj) nenalezen, 2 = cíl neexistuje, 3 = cíl == zdroj.
+inline int presunUkol(StavSeznamu& stav, int zdrojId, int ukolId, int cilId) {
+    Seznam* zdroj = najdiSeznam(stav.seznamy, zdrojId);
+    if (!zdroj) return 1;
+    auto it = std::find_if(zdroj->ukoly.begin(), zdroj->ukoly.end(),
                            [ukolId](const Task& ukol) { return ukol.id == ukolId; });
-    if (it == aktivni->ukoly.end()) return 1;
-    if (cilId == stav.aktivniId) return 3;
+    if (it == zdroj->ukoly.end()) return 1;
+    if (cilId == zdrojId) return 3;
     Seznam* cil = najdiSeznam(stav.seznamy, cilId);
     if (!cil) return 2;
     Task presouvany = *it;
-    aktivni->ukoly.erase(it);
+    zdroj->ukoly.erase(it);
     presouvany.id = cil->ukoly.empty() ? 1 : cil->ukoly.back().id + 1;
     cil->ukoly.push_back(presouvany);
     return 0;
@@ -393,6 +394,17 @@ inline int vycistiHotove(std::vector<Task>& ukoly) {
     int pocet = static_cast<int>(ukoly.end() - it);
     ukoly.erase(it, ukoly.end());
     return pocet;
+}
+
+// Nastaví (či prázdným řetězcem smaže) termín úkolu.
+inline bool nastavTermin(std::vector<Task>& ukoly, int id, const std::string& termin) {
+    for (auto& ukol : ukoly) {
+        if (ukol.id == id) {
+            ukol.termin = termin;
+            return true;
+        }
+    }
+    return false;
 }
 
 // Změní jen popis; ID a done zůstávají.

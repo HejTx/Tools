@@ -533,16 +533,48 @@ void test_presun_ukolu() {
         {2, "B", {{1, "cizi", false}}},
     };
     stav.aktivniId = 1;
-    assert(presunUkol(stav, 1, 2) == 0);
+    assert(presunUkol(stav, 1, 1, 2) == 0);
     assert(stav.seznamy[0].ukoly.size() == 1);
     assert(stav.seznamy[1].ukoly.size() == 2);
     assert(stav.seznamy[1].ukoly[1].id == 2);          // nove ID v cili
     assert(stav.seznamy[1].ukoly[1].description == "prvni");
     assert(stav.seznamy[1].ukoly[1].done == true);     // done se zachova
-    assert(presunUkol(stav, 99, 2) == 1);              // ukol nenalezen
-    assert(presunUkol(stav, 99, 1) == 1);              // neexistence ukolu ma prednost
-    assert(presunUkol(stav, 2, 99) == 2);              // seznam nenalezen
-    assert(presunUkol(stav, 2, 1) == 3);               // cil = aktivni
+    assert(presunUkol(stav, 1, 99, 2) == 1);           // ukol nenalezen
+    assert(presunUkol(stav, 1, 99, 1) == 1);           // neexistence ukolu ma prednost
+    assert(presunUkol(stav, 1, 2, 99) == 2);           // seznam nenalezen
+    assert(presunUkol(stav, 1, 2, 1) == 3);            // cil == zdroj
+}
+
+void test_nastav_termin() {
+    std::vector<Task> ukoly = {{1, "a", false}};
+    assert(nastavTermin(ukoly, 1, "18/07/26"));
+    assert(ukoly[0].termin == "18/07/26");
+    assert(nastavTermin(ukoly, 1, ""));
+    assert(ukoly[0].termin == "");
+    assert(!nastavTermin(ukoly, 99, "18/07/26"));
+}
+
+void test_presun_z_jineho_seznamu() {
+    StavSeznamu stav;
+    stav.seznamy = {{1, "A", {{1, "a1", false}}}, {2, "B", {{1, "b1", false}}}};
+    stav.aktivniId = 1;
+    assert(presunUkol(stav, 2, 1, 1) == 0);  // z B do A, aktivni nehraje roli
+    assert(stav.seznamy[0].ukoly.size() == 2 && stav.seznamy[1].ukoly.empty());
+    assert(stav.seznamy[0].ukoly[1].description == "b1");
+    assert(presunUkol(stav, 99, 1, 1) == 1); // neexistujici zdroj = ukol nenalezen
+}
+
+void test_seznam_nula_stav() {
+    StavSeznamu stav;
+    stav.seznamy = {{1, "A", {}}, {2, "B", {}}};
+    stav.aktivniId = 1;
+    assert(vybratSeznam(stav, 0) && stav.aktivniId == 0);
+    assert(smazatSeznam(stav, 1) && stav.aktivniId == 0);   // prehled zustava
+    assert(smazatSeznam(stav, 2) && stav.aktivniId == 0);   // i po poslednim
+    assert(stav.seznamy.size() == 1 && stav.seznamy[0].nazev == "Ukoly");
+    // @aktivni;0 prezije round-trip
+    StavSeznamu zpet = parsujSeznamy(serializujSeznamy(stav));
+    assert(zpet.aktivniId == 0);
 }
 
 void test_sifrovani_roundtrip() {
@@ -662,6 +694,9 @@ int main() {
     test_upravit_ukol();
     test_vycisti_hotove();
     test_presun_ukolu();
+    test_nastav_termin();
+    test_presun_z_jineho_seznamu();
+    test_seznam_nula_stav();
     test_sifrovani_roundtrip();
     test_sifrovani_prazdny_plaintext();
     test_spatne_heslo();
