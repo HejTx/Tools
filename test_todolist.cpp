@@ -166,6 +166,30 @@ void test_vytiskni_napovedu() {
         "Pokracuj stiskem Enteru...\n");
 }
 
+void test_vytiskni_seznamy_zalamovani() {
+    StavSeznamu stav;
+    stav.seznamy = {{1, "Alfa", {}}, {2, "Beta", {}}, {3, "Gama", {}}};
+    stav.aktivniId = 1;
+    std::ostringstream out;
+    vytiskniSeznamy(out, stav, 45);
+    // 9 + 17 (aktivni) + 3 + 15 = 44 <= 45; Gama by presahla -> zalom
+    assert(out.str() ==
+        "Seznamy: \033[1m>[1] Alfa (0.0%)<\033[0m | [2] Beta (0.0%)\n"
+        "         [3] Gama (0.0%)\n");
+}
+
+void test_vytiskni_seznamy_uzka_obrazovka() {
+    StavSeznamu stav;
+    stav.seznamy = {{1, "Alfa", {}}, {2, "Beta", {}}};
+    stav.aktivniId = 1;
+    std::ostringstream out;
+    vytiskniSeznamy(out, stav, 10);
+    // kazda polozka sirsi nez sirka -> jedna na radek
+    assert(out.str() ==
+        "Seznamy: \033[1m>[1] Alfa (0.0%)<\033[0m\n"
+        "         [2] Beta (0.0%)\n");
+}
+
 void test_vykresli_prazdny_seznam() {
     StavSeznamu stav;
     stav.seznamy = {{1, "Ukoly", {}}};
@@ -491,6 +515,8 @@ int main() {
     test_neznamy_prikaz();
     test_vytiskni_napovedu();
     test_vytiskni_seznamy();
+    test_vytiskni_seznamy_zalamovani();
+    test_vytiskni_seznamy_uzka_obrazovka();
     test_vykresli_prazdny_seznam();
     test_vykresli_ukoly_hotovy_sede();
     test_vykresli_se_zpravou();

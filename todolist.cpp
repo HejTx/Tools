@@ -1,7 +1,17 @@
 #include "todolist.hpp"
 
+#include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
+
+// Šířka terminálu; mimo terminál (pipe) nebo při chybě 80.
+int sirkaTerminalu() {
+    winsize ws{};
+    if (isatty(STDOUT_FILENO) && ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_col > 0) {
+        return ws.ws_col;
+    }
+    return 80;
+}
 
 // Přečte řádek se skrytým echem (termios). Vrací nullopt při EOF.
 // Když stdin není terminál (pipe v testech), čte normálně.
@@ -110,7 +120,7 @@ int main() {
     std::optional<StavSeznamu> predchozi;
     while (true) {
         std::cout << "\033[2J\033[H";
-        vykresliObrazovku(std::cout, stav, zprava);
+        vykresliObrazovku(std::cout, stav, zprava, sirkaTerminalu());
         if (!std::getline(std::cin, radek)) break;
 
         Prikaz prikaz = rozeberPrikaz(radek);

@@ -459,26 +459,42 @@ inline void vytiskniNapovedu(std::ostream& out) {
            "Pokracuj stiskem Enteru...\n";
 }
 
-inline void vytiskniSeznamy(std::ostream& out, const StavSeznamu& stav) {
+// Vypíše řádek seznamů; při přesahu šířky zalamuje s odsazením pod
+// "Seznamy: ". Viditelná délka se počítá bez ANSI kódů (v bajtech, ASCII).
+inline void vytiskniSeznamy(std::ostream& out, const StavSeznamu& stav, int sirka = 80) {
     out << "Seznamy: ";
-    for (size_t i = 0; i < stav.seznamy.size(); ++i) {
-        const Seznam& seznam = stav.seznamy[i];
-        if (i > 0) out << " | ";
+    int delkaRadku = 9;
+    bool prvniNaRadku = true;
+    for (const auto& seznam : stav.seznamy) {
         std::string polozka = "[" + std::to_string(seznam.id) + "] " + seznam.nazev
                               + " (" + formatujProcenta(seznam.ukoly) + ")";
-        if (seznam.id == stav.aktivniId) {
+        bool aktivni = (seznam.id == stav.aktivniId);
+        int viditelna = static_cast<int>(polozka.size()) + (aktivni ? 2 : 0);
+        if (!prvniNaRadku && delkaRadku + 3 + viditelna > sirka) {
+            out << "\n         ";
+            delkaRadku = 9;
+            prvniNaRadku = true;
+        }
+        if (!prvniNaRadku) {
+            out << " | ";
+            delkaRadku += 3;
+        }
+        if (aktivni) {
             out << "\033[1m>" << polozka << "<\033[0m";
         } else {
             out << polozka;
         }
+        delkaRadku += viditelna;
+        prvniNaRadku = false;
     }
     out << "\n";
 }
 
 inline void vykresliObrazovku(std::ostream& out,
                               const StavSeznamu& stav,
-                              const std::string& zprava) {
-    vytiskniSeznamy(out, stav);
+                              const std::string& zprava,
+                              int sirka = 80) {
+    vytiskniSeznamy(out, stav, sirka);
     const Seznam* aktivni = najdiSeznam(stav.seznamy, stav.aktivniId);
     out << "=== " << aktivni->nazev << " ===\n";
     if (aktivni->ukoly.empty()) {
