@@ -107,6 +107,7 @@ int main() {
 
     std::string radek;
     std::string zprava;
+    std::optional<StavSeznamu> predchozi;
     while (true) {
         std::cout << "\033[2J\033[H";
         vykresliObrazovku(std::cout, stav, zprava);
@@ -114,6 +115,14 @@ int main() {
 
         Prikaz prikaz = rozeberPrikaz(radek);
         if (prikaz.typ == TypPrikazu::Konec) break;
+
+        // Záloha stavu pro 'u'; ukládá se po switchi, jen když se stav změnil.
+        bool sledovatZmenu =
+            prikaz.typ != TypPrikazu::Zpet && prikaz.typ != TypPrikazu::Ulozit &&
+            prikaz.typ != TypPrikazu::Napoveda && prikaz.typ != TypPrikazu::ZmenaHesla &&
+            prikaz.typ != TypPrikazu::Neznamy;
+        StavSeznamu zaloha;
+        if (sledovatZmenu) zaloha = stav;
 
         // Pozor: ukazatel na aktivní seznam se resolvuje až v jednotlivých
         // větvích — příkazy nad seznamy (push_back/erase) by ho zneplatnily.
@@ -219,6 +228,14 @@ int main() {
                 }
                 break;
             }
+            case TypPrikazu::Zpet:
+                if (predchozi) {
+                    std::swap(stav, *predchozi);
+                    zprava = "Posledni zmena vracena. (u = znovu)";
+                } else {
+                    zprava = "Neni co vratit.";
+                }
+                break;
             case TypPrikazu::Napoveda: {
                 std::cout << "\033[2J\033[H";
                 vytiskniNapovedu(std::cout);
@@ -235,6 +252,9 @@ int main() {
             default:
                 zprava = "Neznamy prikaz.";
                 break;
+        }
+        if (sledovatZmenu && serializujSeznamy(zaloha) != serializujSeznamy(stav)) {
+            predchozi = std::move(zaloha);
         }
         if (prikaz.typ == TypPrikazu::Konec) break;
     }
