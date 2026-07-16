@@ -376,6 +376,13 @@ void test_upravit_ukol() {
     assert(!upravitUkol(ukoly, 99, "x"));
 }
 
+void test_vycisti_hotove() {
+    std::vector<Task> ukoly = {{1, "a", true}, {2, "b", false}, {3, "c", true}};
+    assert(vycistiHotove(ukoly) == 2);
+    assert(ukoly.size() == 1 && ukoly[0].description == "b");
+    assert(vycistiHotove(ukoly) == 0);
+}
+
 void test_sifrovani_roundtrip() {
     std::array<unsigned char, crypto_pwhash_SALTBYTES> sul;
     randombytes_buf(sul.data(), sul.size());
@@ -479,6 +486,7 @@ int main() {
     test_smazat_aktivni_seznam();
     test_smazat_posledni_seznam();
     test_upravit_ukol();
+    test_vycisti_hotove();
     test_sifrovani_roundtrip();
     test_sifrovani_prazdny_plaintext();
     test_spatne_heslo();

@@ -290,6 +290,15 @@ inline bool oznacitUkolDokonceny(std::vector<Task>& ukoly, int id) {
     return false;
 }
 
+// Odstraní hotové úkoly; vrací jejich počet.
+inline int vycistiHotove(std::vector<Task>& ukoly) {
+    auto it = std::remove_if(ukoly.begin(), ukoly.end(),
+                             [](const Task& ukol) { return ukol.done; });
+    int pocet = static_cast<int>(ukoly.end() - it);
+    ukoly.erase(it, ukoly.end());
+    return pocet;
+}
+
 // Změní jen popis; ID a done zůstávají.
 inline bool upravitUkol(std::vector<Task>& ukoly, int id, const std::string& popis) {
     for (auto& ukol : ukoly) {

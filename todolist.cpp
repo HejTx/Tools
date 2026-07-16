@@ -152,6 +152,13 @@ int main() {
                     zprava = "Ukol s ID " + std::to_string(prikaz.id) + " nenalezen.";
                 }
                 break;
+            case TypPrikazu::VycistitHotove: {
+                int pocet = vycistiHotove(najdiSeznam(stav.seznamy, stav.aktivniId)->ukoly);
+                zprava = (pocet == 0)
+                             ? "Zadne hotove ukoly k odstraneni."
+                             : "Odstraneno hotovych ukolu: " + std::to_string(pocet) + ".";
+                break;
+            }
             case TypPrikazu::Ulozit:
                 zprava = ulozSeznamy(stav, soubor, klic, sul)
                              ? "Ukoly ulozeny."
