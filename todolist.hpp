@@ -438,6 +438,9 @@ inline void vytiskniNapovedu(std::ostream& out) {
            "  p <popis>        Prida novy ukol do aktivniho seznamu.\n"
            "  o <id>           Oznaci ukol jako hotovy.\n"
            "  r <id>           Odebere ukol ze seznamu.\n"
+           "  e <id> <popis>   Upravi popis ukolu.\n"
+           "  m <id> <sid>     Presune ukol do seznamu <sid>.\n"
+           "  c                Odstrani hotove ukoly z aktivniho seznamu.\n"
            "\n"
            "PRIKAZY SEZNAMU\n"
            "  n <nazev>        Zalozi novy seznam a prepne na nej.\n"
@@ -447,8 +450,10 @@ inline void vytiskniNapovedu(std::ostream& out) {
            "  d <id>           Smaze seznam podle ID.\n"
            "\n"
            "OSTATNI\n"
+           "  u                Vrati posledni zmenu (u znovu = zpet).\n"
            "  s                Ulozi vsechny seznamy.\n"
            "  q                Ulozi a ukonci program.\n"
+           "  zh               Zmeni heslo souboru.\n"
            "  h                Zobrazi tuto napovedu.\n"
            "\n"
            "Pokracuj stiskem Enteru...\n";
@@ -485,6 +490,7 @@ inline void vykresliObrazovku(std::ostream& out,
     if (!zprava.empty()) {
         out << zprava << "\n\n";
     }
-    out << "Prikazy: p <popis> | o <id> | r <id> | n <nazev> | v <id> | j <id> <nazev> | d [id] | s | q | h\n"
+    out << "\033[90mukol: p pridat · o hotovo · r odebrat · e upravit · m presunout · c uklidit\n"
+           "seznam: n novy · v vybrat · j prejmenovat · d smazat | u zpet · s ulozit · q konec · h napoveda\033[0m\n"
         << "> ";
 }
