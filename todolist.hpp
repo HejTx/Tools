@@ -283,13 +283,38 @@ inline bool oznacitUkolDokonceny(std::vector<Task>& ukoly, int id) {
     return false;
 }
 
-enum class TypPrikazu { Pridat, Oznacit, Odebrat, Konec, Neznamy, Ulozit };
+enum class TypPrikazu { Pridat, Oznacit, Odebrat, Konec, Neznamy, Ulozit,
+                        NovySeznam, VybratSeznam, PrejmenovatSeznam, SmazatSeznam };
 
 struct Prikaz {
     TypPrikazu typ = TypPrikazu::Neznamy;
     std::string popis;
     int id = -1;
 };
+
+// Zbytek řádku bez úvodních mezer (popis úkolu / název seznamu).
+inline std::string zbytekRadku(std::istringstream& ss) {
+    std::string zbytek;
+    std::getline(ss, zbytek);
+    size_t start = zbytek.find_first_not_of(' ');
+    return (start == std::string::npos) ? "" : zbytek.substr(start);
+}
+
+// Načte číselný argument do prikaz.id; při chybě nastaví Neznamy a vrátí false.
+inline bool nactiIdArgument(std::istringstream& ss, Prikaz& prikaz) {
+    std::string idStr;
+    if (!(ss >> idStr)) {
+        prikaz.typ = TypPrikazu::Neznamy;
+        return false;
+    }
+    try {
+        prikaz.id = std::stoi(idStr);
+        return true;
+    } catch (...) {
+        prikaz.typ = TypPrikazu::Neznamy;
+        return false;
+    }
+}
 
 inline Prikaz rozeberPrikaz(const std::string& radek) {
     Prikaz prikaz;
@@ -303,12 +328,23 @@ inline Prikaz rozeberPrikaz(const std::string& radek) {
         prikaz.typ = TypPrikazu::Ulozit;
     } else if (token == "p") {
         prikaz.typ = TypPrikazu::Pridat;
-        std::string zbytek;
-        std::getline(ss, zbytek);
-        size_t start = zbytek.find_first_not_of(' ');
-        prikaz.popis = (start == std::string::npos) ? "" : zbytek.substr(start);
+        prikaz.popis = zbytekRadku(ss);
     } else if (token == "o" || token == "r") {
         prikaz.typ = (token == "o") ? TypPrikazu::Oznacit : TypPrikazu::Odebrat;
+        nactiIdArgument(ss, prikaz);
+    } else if (token == "n") {
+        prikaz.typ = TypPrikazu::NovySeznam;
+        prikaz.popis = zbytekRadku(ss);
+    } else if (token == "v") {
+        prikaz.typ = TypPrikazu::VybratSeznam;
+        nactiIdArgument(ss, prikaz);
+    } else if (token == "j") {
+        prikaz.typ = TypPrikazu::PrejmenovatSeznam;
+        if (nactiIdArgument(ss, prikaz)) {
+            prikaz.popis = zbytekRadku(ss);
+        }
+    } else if (token == "d") {
+        prikaz.typ = TypPrikazu::SmazatSeznam;
         std::string idStr;
         if (ss >> idStr) {
             try {
@@ -316,9 +352,8 @@ inline Prikaz rozeberPrikaz(const std::string& radek) {
             } catch (...) {
                 prikaz.typ = TypPrikazu::Neznamy;
             }
-        } else {
-            prikaz.typ = TypPrikazu::Neznamy;
         }
+        // bez argumentu: id zůstává -1 = smazat aktivní seznam
     } else {
         prikaz.typ = TypPrikazu::Neznamy;
     }

@@ -53,6 +53,39 @@ void test_oznacit_chybejici_id() {
     assert(p.typ == TypPrikazu::Neznamy);
 }
 
+void test_novy_seznam_prikaz() {
+    Prikaz p = rozeberPrikaz("n Ukoly EQ tyden");
+    assert(p.typ == TypPrikazu::NovySeznam);
+    assert(p.popis == "Ukoly EQ tyden");
+    Prikaz prazdny = rozeberPrikaz("n");
+    assert(prazdny.typ == TypPrikazu::NovySeznam && prazdny.popis == "");
+}
+
+void test_vybrat_seznam_prikaz() {
+    Prikaz p = rozeberPrikaz("v 2");
+    assert(p.typ == TypPrikazu::VybratSeznam && p.id == 2);
+    assert(rozeberPrikaz("v abc").typ == TypPrikazu::Neznamy);
+    // "v" bez ID zůstává Neznamy (test_vypsat_je_neznamy to už kontroluje)
+}
+
+void test_prejmenovat_prikaz() {
+    Prikaz p = rozeberPrikaz("j 2 Novy nazev");
+    assert(p.typ == TypPrikazu::PrejmenovatSeznam);
+    assert(p.id == 2 && p.popis == "Novy nazev");
+    assert(rozeberPrikaz("j").typ == TypPrikazu::Neznamy);
+    assert(rozeberPrikaz("j abc X").typ == TypPrikazu::Neznamy);
+    Prikaz bezNazvu = rozeberPrikaz("j 2");
+    assert(bezNazvu.typ == TypPrikazu::PrejmenovatSeznam && bezNazvu.popis == "");
+}
+
+void test_smazat_prikaz() {
+    Prikaz bezId = rozeberPrikaz("d");
+    assert(bezId.typ == TypPrikazu::SmazatSeznam && bezId.id == -1);
+    Prikaz sId = rozeberPrikaz("d 3");
+    assert(sId.typ == TypPrikazu::SmazatSeznam && sId.id == 3);
+    assert(rozeberPrikaz("d abc").typ == TypPrikazu::Neznamy);
+}
+
 void test_neznamy_prikaz() {
     Prikaz p = rozeberPrikaz("xyz");
     assert(p.typ == TypPrikazu::Neznamy);
@@ -300,6 +333,10 @@ int main() {
     test_odebrat_platne_id();
     test_oznacit_chybne_id();
     test_oznacit_chybejici_id();
+    test_novy_seznam_prikaz();
+    test_vybrat_seznam_prikaz();
+    test_prejmenovat_prikaz();
+    test_smazat_prikaz();
     test_neznamy_prikaz();
     test_vykresli_prazdny_seznam();
     test_vykresli_ukoly_hotovy_sede();
