@@ -197,6 +197,23 @@ inline bool smazatSeznam(StavSeznamu& stav, int id) {
     return true;
 }
 
+// Přesune úkol z aktivního seznamu do cílového; v cíli dostane nové ID.
+// 0 = OK, 1 = úkol nenalezen, 2 = cílový seznam neexistuje, 3 = cíl je aktivní.
+inline int presunUkol(StavSeznamu& stav, int ukolId, int cilId) {
+    if (cilId == stav.aktivniId) return 3;
+    Seznam* cil = najdiSeznam(stav.seznamy, cilId);
+    if (!cil) return 2;
+    Seznam* aktivni = najdiSeznam(stav.seznamy, stav.aktivniId);
+    auto it = std::find_if(aktivni->ukoly.begin(), aktivni->ukoly.end(),
+                           [ukolId](const Task& ukol) { return ukol.id == ukolId; });
+    if (it == aktivni->ukoly.end()) return 1;
+    Task presouvany = *it;
+    aktivni->ukoly.erase(it);
+    presouvany.id = cil->ukoly.empty() ? 1 : cil->ukoly.back().id + 1;
+    cil->ukoly.push_back(presouvany);
+    return 0;
+}
+
 // Uloží všechny seznamy zašifrovaně (stejný klíč a sůl, nová nonce při každém zápisu).
 // Zapisuje přes dočasný soubor a rename, aby selhání zápisu nezničilo původní data.
 // Vrací false, když se zápis nezdařil (původní soubor zůstává nedotčen).

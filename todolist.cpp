@@ -152,6 +152,23 @@ int main() {
                     zprava = "Ukol s ID " + std::to_string(prikaz.id) + " nenalezen.";
                 }
                 break;
+            case TypPrikazu::PresunoutUkol:
+                switch (presunUkol(stav, prikaz.id, prikaz.id2)) {
+                    case 0:
+                        zprava = "Ukol presunut do seznamu '"
+                                 + najdiSeznam(stav.seznamy, prikaz.id2)->nazev + "'.";
+                        break;
+                    case 1:
+                        zprava = "Ukol s ID " + std::to_string(prikaz.id) + " nenalezen.";
+                        break;
+                    case 2:
+                        zprava = "Seznam s ID " + std::to_string(prikaz.id2) + " nenalezen.";
+                        break;
+                    default:
+                        zprava = "Ukol uz je v aktivnim seznamu.";
+                        break;
+                }
+                break;
             case TypPrikazu::VycistitHotove: {
                 int pocet = vycistiHotove(najdiSeznam(stav.seznamy, stav.aktivniId)->ukoly);
                 zprava = (pocet == 0)

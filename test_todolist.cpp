@@ -383,6 +383,24 @@ void test_vycisti_hotove() {
     assert(vycistiHotove(ukoly) == 0);
 }
 
+void test_presun_ukolu() {
+    StavSeznamu stav;
+    stav.seznamy = {
+        {1, "A", {{1, "prvni", true}, {2, "druhy", false}}},
+        {2, "B", {{1, "cizi", false}}},
+    };
+    stav.aktivniId = 1;
+    assert(presunUkol(stav, 1, 2) == 0);
+    assert(stav.seznamy[0].ukoly.size() == 1);
+    assert(stav.seznamy[1].ukoly.size() == 2);
+    assert(stav.seznamy[1].ukoly[1].id == 2);          // nove ID v cili
+    assert(stav.seznamy[1].ukoly[1].description == "prvni");
+    assert(stav.seznamy[1].ukoly[1].done == true);     // done se zachova
+    assert(presunUkol(stav, 99, 2) == 1);              // ukol nenalezen
+    assert(presunUkol(stav, 2, 99) == 2);              // seznam nenalezen
+    assert(presunUkol(stav, 2, 1) == 3);               // cil = aktivni
+}
+
 void test_sifrovani_roundtrip() {
     std::array<unsigned char, crypto_pwhash_SALTBYTES> sul;
     randombytes_buf(sul.data(), sul.size());
@@ -487,6 +505,7 @@ int main() {
     test_smazat_posledni_seznam();
     test_upravit_ukol();
     test_vycisti_hotove();
+    test_presun_ukolu();
     test_sifrovani_roundtrip();
     test_sifrovani_prazdny_plaintext();
     test_spatne_heslo();
