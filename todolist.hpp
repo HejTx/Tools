@@ -40,6 +40,43 @@ inline int klicTerminu(const std::string& termin) {
     return rok * 10000 + mesic * 100 + den;
 }
 
+// Chybová hláška pro neplatný název seznamu, jinak "".
+inline std::string zkontrolujNazevSeznamu(const std::string& nazev) {
+    if (nazev.empty()) return "Nazev nesmi byt prazdny.";
+    if (nazev.find(';') != std::string::npos) return "Nazev nesmi obsahovat znak ';'.";
+    if (nazev.find('/') != std::string::npos) return "Nazev nesmi obsahovat znak '/'.";
+    if (nazev[0] == '.') return "Nazev nesmi zacinat teckou.";
+    return "";
+}
+
+// Globální nešifrované předvolby (razeni, naposledy otevřený seznam).
+struct Nastaveni {
+    int razeni = 1;
+    std::string posledni;
+};
+
+inline std::string serializujNastaveni(const Nastaveni& nastaveni) {
+    return "razeni;" + std::to_string(nastaveni.razeni)
+         + "\nposledni;" + nastaveni.posledni + "\n";
+}
+
+inline Nastaveni parsujNastaveni(const std::string& obsah) {
+    Nastaveni nastaveni;
+    std::istringstream in(obsah);
+    std::string line;
+    while (std::getline(in, line)) {
+        if (line.rfind("razeni;", 0) == 0) {
+            try {
+                nastaveni.razeni = std::stoi(line.substr(std::string("razeni;").size()));
+            } catch (...) {}
+        } else if (line.rfind("posledni;", 0) == 0) {
+            nastaveni.posledni = line.substr(std::string("posledni;").size());
+        }
+    }
+    if (nastaveni.razeni != 2) nastaveni.razeni = 1;
+    return nastaveni;
+}
+
 // Podíl hotových úkolů jako "50.0%"; prázdno = "0.0%".
 inline std::string formatujProcenta(int hotovo, int celkem) {
     double procenta = (celkem == 0) ? 0.0 : 100.0 * hotovo / celkem;

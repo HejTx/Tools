@@ -442,6 +442,27 @@ void test_uloz_seznamy_uspech_a_selhani() {
     assert(!ulozSeznamy(stav, "neexistujici_adresar/ukoly.txt", klic, sul));
 }
 
+void test_kontrola_nazvu_seznamu() {
+    assert(zkontrolujNazevSeznamu("Nakup") == "");
+    assert(zkontrolujNazevSeznamu("Ukoly EQ tyden") == "");
+    assert(zkontrolujNazevSeznamu("") == "Nazev nesmi byt prazdny.");
+    assert(zkontrolujNazevSeznamu("a;b") == "Nazev nesmi obsahovat znak ';'.");
+    assert(zkontrolujNazevSeznamu("a/b") == "Nazev nesmi obsahovat znak '/'.");
+    assert(zkontrolujNazevSeznamu(".skryty") == "Nazev nesmi zacinat teckou.");
+}
+
+void test_nastaveni_roundtrip() {
+    Nastaveni n;
+    n.razeni = 2;
+    n.posledni = "Ukoly EQ tyden";
+    assert(serializujNastaveni(n) == "razeni;2\nposledni;Ukoly EQ tyden\n");
+    Nastaveni zpet = parsujNastaveni(serializujNastaveni(n));
+    assert(zpet.razeni == 2 && zpet.posledni == "Ukoly EQ tyden");
+    Nastaveni prazdne = parsujNastaveni("");
+    assert(prazdne.razeni == 1 && prazdne.posledni == "");
+    assert(parsujNastaveni("razeni;9\n").razeni == 1);
+}
+
 void test_razeni_roundtrip() {
     StavSeznamu stav;
     stav.seznamy = {{1, "A", {}}};
@@ -708,6 +729,8 @@ int main() {
     test_migrace_stareho_formatu();
     test_parsovani_prazdneho_obsahu();
     test_neplatne_aktivni_id();
+    test_kontrola_nazvu_seznamu();
+    test_nastaveni_roundtrip();
     test_razeni_roundtrip();
     test_serazene_ukoly();
     test_sestav_prehled();

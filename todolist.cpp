@@ -83,13 +83,6 @@ std::optional<std::string> zvolNoveHeslo() {
     }
 }
 
-// Vrátí chybovou hlášku pro neplatný název seznamu, jinak prázdný string.
-std::string zkontrolujNazev(const std::string& nazev) {
-    if (nazev.empty()) return "Nazev nesmi byt prazdny.";
-    if (nazev.find(';') != std::string::npos) return "Nazev nesmi obsahovat znak ';'.";
-    return "";
-}
-
 // Zvolí nové heslo, vygeneruje čerstvou sůl a odvodí klíč. false = EOF.
 bool nastavNovyKlic(std::vector<unsigned char>& klic,
                     std::array<unsigned char, crypto_pwhash_SALTBYTES>& sul) {
@@ -288,7 +281,7 @@ int main() {
                              : "CHYBA: Ulozeni se nezdarilo, zkus to znovu.";
                 break;
             case TypPrikazu::NovySeznam:
-                zprava = zkontrolujNazev(prikaz.popis);
+                zprava = zkontrolujNazevSeznamu(prikaz.popis);
                 if (zprava.empty()) {
                     pridatSeznam(stav, prikaz.popis);
                     zprava = "Seznam '" + prikaz.popis + "' zalozen.";
@@ -305,7 +298,7 @@ int main() {
                 }
                 break;
             case TypPrikazu::PrejmenovatSeznam:
-                zprava = zkontrolujNazev(prikaz.popis);
+                zprava = zkontrolujNazevSeznamu(prikaz.popis);
                 if (!zprava.empty()) {
                     break;
                 }
