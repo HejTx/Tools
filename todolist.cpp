@@ -4,6 +4,29 @@
 #include <termios.h>
 #include <unistd.h>
 
+#include <cstdlib>
+#include <filesystem>
+
+// Datový soubor v $XDG_DATA_HOME/todolist/, jinak ~/.local/share/todolist/.
+// Bez obou proměnných (nebo při chybě) zůstává ukoly.txt v aktuálním adresáři.
+std::string cestaKSouboru() {
+    std::filesystem::path zaklad;
+    const char* xdg = std::getenv("XDG_DATA_HOME");
+    const char* home = std::getenv("HOME");
+    if (xdg && *xdg) {
+        zaklad = xdg;
+    } else if (home && *home) {
+        zaklad = std::filesystem::path(home) / ".local" / "share";
+    } else {
+        return "ukoly.txt";
+    }
+    std::filesystem::path adresar = zaklad / "todolist";
+    std::error_code ec;
+    std::filesystem::create_directories(adresar, ec);
+    if (ec) return "ukoly.txt";
+    return (adresar / "ukoly.txt").string();
+}
+
 // Šířka terminálu; mimo terminál (pipe) nebo při chybě 80.
 int sirkaTerminalu() {
     winsize ws{};
@@ -84,13 +107,20 @@ int main() {
         return 1;
     }
 
-    const std::string soubor = "ukoly.txt";
+    const std::string soubor = cestaKSouboru();
 
     StavSeznamu stav;
     std::vector<unsigned char> klic;
     std::array<unsigned char, crypto_pwhash_SALTBYTES> sul{};
 
     std::optional<std::string> obsah = nactiObsahSouboru(soubor);
+    if (!obsah && soubor != "ukoly.txt") {
+        obsah = nactiObsahSouboru("ukoly.txt");
+        if (obsah) {
+            std::cout << "Soubor ukoly.txt z aktualniho adresare byl nacten; nove se uklada do "
+                      << soubor << ".\n";
+        }
+    }
     if (!obsah) {
         std::cout << "Soubor " << soubor << " neexistuje, zaklada se novy sifrovany seznam.\n";
         stav = parsujSeznamy("");
