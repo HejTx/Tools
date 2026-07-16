@@ -112,6 +112,33 @@ void test_bezargumentove_prikazy() {
     assert(rozeberPrikaz("zh").typ == TypPrikazu::ZmenaHesla);
 }
 
+void test_slozene_id() {
+    Prikaz p = rozeberPrikaz("o 2.3");
+    assert(p.typ == TypPrikazu::Oznacit && p.seznamUkolu == 2 && p.id == 3);
+    Prikaz proste = rozeberPrikaz("o 3");
+    assert(proste.typ == TypPrikazu::Oznacit && proste.seznamUkolu == -1 && proste.id == 3);
+    assert(rozeberPrikaz("o 2.").typ == TypPrikazu::Neznamy);
+    assert(rozeberPrikaz("o .3").typ == TypPrikazu::Neznamy);
+    assert(rozeberPrikaz("o 2.x").typ == TypPrikazu::Neznamy);
+    Prikaz presun = rozeberPrikaz("m 2.3 4");
+    assert(presun.typ == TypPrikazu::PresunoutUkol);
+    assert(presun.seznamUkolu == 2 && presun.id == 3 && presun.id2 == 4);
+}
+
+void test_termin_prikaz() {
+    Prikaz p = rozeberPrikaz("t 2 18/07/26");
+    assert(p.typ == TypPrikazu::Termin && p.id == 2 && p.popis == "18/07/26");
+    Prikaz slozeny = rozeberPrikaz("t 2.3 18/07/26");
+    assert(slozeny.typ == TypPrikazu::Termin && slozeny.seznamUkolu == 2 && slozeny.id == 3);
+    Prikaz mazani = rozeberPrikaz("t 2");
+    assert(mazani.typ == TypPrikazu::Termin && mazani.popis == "");
+    assert(rozeberPrikaz("t").typ == TypPrikazu::Neznamy);
+}
+
+void test_razeni_prikaz() {
+    assert(rozeberPrikaz("z").typ == TypPrikazu::PrepnoutRazeni);
+}
+
 void test_napoveda_prikaz() {
     assert(rozeberPrikaz("h").typ == TypPrikazu::Napoveda);
     assert(rozeberPrikaz("h cokoli").typ == TypPrikazu::Napoveda);  // zbytek se ignoruje
@@ -596,6 +623,9 @@ int main() {
     test_upravit_prikaz();
     test_presunout_prikaz();
     test_bezargumentove_prikazy();
+    test_slozene_id();
+    test_termin_prikaz();
+    test_razeni_prikaz();
     test_napoveda_prikaz();
     test_neznamy_prikaz();
     test_vytiskni_napovedu();
