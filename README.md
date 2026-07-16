@@ -1,4 +1,16 @@
-# todolist — šifrovaný TODO list v terminálu
+# Tools
+
+Sbírka nástrojů pro terminál. Každý nástroj žije ve vlastní složce
+se zdrojáky, testy a návrhovou dokumentací; tenhle README je popisuje
+všechny na jednom místě.
+
+| Nástroj | Popis |
+|---|---|
+| [`todolist/`](todolist/) | Šifrovaný TODO list v terminálu (trezory s vlastními hesly) |
+
+---
+
+## todolist — šifrovaný TODO list v terminálu
 
 Jednoduchý správce úkolů pro terminál. Každý seznam úkolů je samostatný
 **trezor** — soubor šifrovaný vlastním heslem (libsodium: Argon2id +
@@ -18,7 +30,7 @@ jine: u zpet · z razeni · s ulozit · zh heslo · q konec · h napoveda
 >
 ```
 
-## Funkce
+### Funkce
 
 - **Trezory:** každý seznam má vlastní heslo a vlastní šifrovaný soubor;
   odemyká se při startu nebo za běhu (`v <id>`), zamčené seznamy jsou
@@ -37,20 +49,21 @@ jine: u zpet · z razeni · s ulozit · zh heslo · q konec · h napoveda
   uložení se poctivě hlásí; heslo lze změnit za běhu (`zh`).
 - Nápověda `h` obsahuje manuál všech příkazů.
 
-## Sestavení
+### Sestavení
 
 Vyžaduje g++ (C++17) a libsodium:
 
 ```bash
 sudo apt install libsodium-dev
+cd todolist
 make        # sestaví todolist.exe
 make test   # sestaví a spustí testy
 ```
 
-## Použití
+### Použití
 
 ```bash
-./todolist.exe
+cd todolist && ./todolist.exe
 ```
 
 Při startu zadáš **název seznamu** (Enter přijme naposledy otevřený)
@@ -68,9 +81,9 @@ Pozn.: **názvy** seznamů jsou zároveň názvy souborů, takže šifrovaný je
 obsah úkolů, nikoli jména seznamů. Starší jednosouborový formát
 (`ukoly.txt`) se při prvním spuštění automaticky rozdělí na trezory.
 
-## Vývoj
+### Vývoj
 
-Psáno testově (plain-assert testy v `test_todolist.cpp`, exact-string
-kontroly vykreslování). Návrhové dokumenty jednotlivých funkcí jsou
-v `docs/superpowers/specs/`, implementační plány v
-`docs/superpowers/plans/`.
+Psáno testově (plain-assert testy v `todolist/test_todolist.cpp`,
+exact-string kontroly vykreslování). Návrhové dokumenty jednotlivých
+funkcí jsou v `todolist/docs/superpowers/specs/`, implementační plány
+v `todolist/docs/superpowers/plans/`.
