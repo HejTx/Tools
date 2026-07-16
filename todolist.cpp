@@ -6,10 +6,10 @@
 
 #include <cstdlib>
 #include <filesystem>
+#include <set>
 
-// Datový soubor v $XDG_DATA_HOME/todolist/, jinak ~/.local/share/todolist/.
-// Bez obou proměnných (nebo při chybě) zůstává ukoly.txt v aktuálním adresáři.
-std::string cestaKSouboru() {
+// Datový adresář ($XDG_DATA_HOME|~/.local/share)/todolist, "" = fallback na cwd.
+std::string datovyAdresar() {
     std::filesystem::path zaklad;
     const char* xdg = std::getenv("XDG_DATA_HOME");
     const char* home = std::getenv("HOME");
@@ -18,13 +18,23 @@ std::string cestaKSouboru() {
     } else if (home && *home) {
         zaklad = std::filesystem::path(home) / ".local" / "share";
     } else {
-        return "ukoly.txt";
+        return "";
     }
     std::filesystem::path adresar = zaklad / "todolist";
     std::error_code ec;
-    std::filesystem::create_directories(adresar, ec);
-    if (ec) return "ukoly.txt";
-    return (adresar / "ukoly.txt").string();
+    std::filesystem::create_directories(adresar / "seznamy", ec);
+    if (ec) return "";
+    return adresar.string();
+}
+
+std::string cestaSeznamu(const std::string& adresar, const std::string& nazev) {
+    if (adresar.empty()) return "seznamy/" + nazev + ".txt";
+    return adresar + "/seznamy/" + nazev + ".txt";
+}
+
+std::string cestaNastaveni(const std::string& adresar) {
+    if (adresar.empty()) return "nastaveni.txt";
+    return adresar + "/nastaveni.txt";
 }
 
 // Šířka terminálu; mimo terminál (pipe) nebo při chybě 80.
@@ -94,73 +104,229 @@ bool nastavNovyKlic(std::vector<unsigned char>& klic,
     return true;
 }
 
+// Rozdělí starý víceseznamový soubor na trezory se stejným heslem.
+// true = hotovo, false = zrušeno (EOF) nebo selhání zápisu.
+bool migrujStaryFormat(const std::string& staraCesta, const std::string& adresar,
+                       Nastaveni& nastaveni, bool prejmenovat) {
+    std::optional<std::string> obsah = nactiObsahSouboru(staraCesta);
+    if (!obsah) return false;
+
+    std::cout << "Nalezen soubor stareho formatu: " << staraCesta
+              << " - rozdeli se na samostatne sifrovane seznamy.\n";
+
+    std::string plaintext;
+    std::optional<std::string> heslo;
+    if (jeSifrovany(*obsah)) {
+        while (true) {
+            heslo = prectiHeslo("Dosavadni heslo: ");
+            if (!heslo) return false;
+            std::optional<VysledekDesifrovani> vysledek = desifruj(*obsah, *heslo);
+            if (vysledek) {
+                plaintext = vysledek->plaintext;
+                break;
+            }
+            sodium_memzero(heslo->data(), heslo->size());
+            std::cout << "Spatne heslo nebo poskozeny soubor, zkus to znovu.\n";
+        }
+    } else {
+        std::cout << "Soubor je nesifrovany; zvol heslo pro vsechny seznamy.\n";
+        heslo = zvolNoveHeslo();
+        if (!heslo) return false;
+        plaintext = *obsah;
+    }
+
+    StavSeznamu stary = parsujSeznamy(plaintext);
+    int vytvoreno = 0;
+    for (auto& seznam : stary.seznamy) {
+        randombytes_buf(seznam.sul.data(), seznam.sul.size());
+        seznam.klic = odvodKlic(*heslo, seznam.sul.data());
+        if (!ulozSeznamDoSouboru(seznam, cestaSeznamu(adresar, seznam.nazev))) {
+            sodium_memzero(heslo->data(), heslo->size());
+            return false;
+        }
+        ++vytvoreno;
+        if (seznam.id == stary.aktivniId) nastaveni.posledni = seznam.nazev;
+    }
+    sodium_memzero(heslo->data(), heslo->size());
+    nastaveni.razeni = stary.razeni;
+
+    if (prejmenovat) {
+        std::rename(staraCesta.c_str(), (staraCesta + ".stara").c_str());
+    }
+    std::cout << "Vytvoreno seznamu: " << vytvoreno << " (vsechny se stejnym heslem).\n";
+    return true;
+}
+
 int main() {
     if (sodium_init() < 0) {
         std::cerr << "Nepodarilo se inicializovat libsodium.\n";
         return 1;
     }
 
-    const std::string soubor = cestaKSouboru();
+    const std::string adresar = datovyAdresar();
+    if (adresar.empty()) {
+        std::error_code ec;
+        std::filesystem::create_directories("seznamy", ec);
+    }
+    Nastaveni nastaveni =
+        parsujNastaveni(nactiObsahSouboru(cestaNastaveni(adresar)).value_or(""));
+
+    // sken trezorů -> pahýly (abecedně, ID 1..n)
+    auto nactiPahyly = [&]() {
+        std::vector<std::string> nazvy;
+        std::error_code ec;
+        std::string slozka = adresar.empty() ? "seznamy" : adresar + "/seznamy";
+        for (const auto& polozka : std::filesystem::directory_iterator(slozka, ec)) {
+            if (polozka.is_regular_file() && polozka.path().extension() == ".txt") {
+                nazvy.push_back(polozka.path().stem().string());
+            }
+        }
+        std::sort(nazvy.begin(), nazvy.end());
+        std::vector<Seznam> pahyly;
+        for (size_t i = 0; i < nazvy.size(); ++i) {
+            Seznam pahyl;
+            pahyl.id = static_cast<int>(i) + 1;
+            pahyl.nazev = nazvy[i];
+            pahyl.odemceno = false;
+            pahyly.push_back(std::move(pahyl));
+        }
+        return pahyly;
+    };
+
+    std::vector<Seznam> pahyly = nactiPahyly();
+    if (pahyly.empty()) {
+        std::string staraData = adresar.empty() ? "ukoly.txt" : adresar + "/ukoly.txt";
+        if (nactiObsahSouboru(staraData)) {
+            if (!migrujStaryFormat(staraData, adresar, nastaveni, true)) return 0;
+        } else if (!adresar.empty() && nactiObsahSouboru("ukoly.txt")) {
+            if (!migrujStaryFormat("ukoly.txt", adresar, nastaveni, false)) return 0;
+        }
+        pahyly = nactiPahyly();
+    }
 
     StavSeznamu stav;
-    std::vector<unsigned char> klic;
-    std::array<unsigned char, crypto_pwhash_SALTBYTES> sul{};
+    stav.seznamy = std::move(pahyly);
+    stav.razeni = nastaveni.razeni;
 
-    std::optional<std::string> obsah = nactiObsahSouboru(soubor);
-    std::string zdroj = soubor;  // odkud data skutečně přišla (kvůli hláškám)
-    if (!obsah && soubor != "ukoly.txt") {
-        obsah = nactiObsahSouboru("ukoly.txt");
-        if (obsah) {
-            zdroj = "ukoly.txt";
-            std::cout << "Soubor ukoly.txt z aktualniho adresare byl nacten; nove se uklada do "
-                      << soubor << ".\n";
+    // volba prvního seznamu (jméno -> heslo; neexistující -> založení)
+    while (true) {
+        std::string vyzva = nastaveni.posledni.empty()
+                                ? "Seznam: "
+                                : "Seznam [" + nastaveni.posledni + "]: ";
+        std::cout << vyzva << std::flush;
+        std::string nazev;
+        if (!std::getline(std::cin, nazev)) return 0;
+        if (nazev.empty()) nazev = nastaveni.posledni;
+        std::string chyba = zkontrolujNazevSeznamu(nazev);
+        if (!chyba.empty()) {
+            std::cout << chyba << "\n";
+            continue;
         }
-    }
-    if (!obsah) {
-        std::cout << "Soubor " << soubor << " neexistuje, zaklada se novy sifrovany seznam.\n";
-        stav = parsujSeznamy("");
-        if (!nastavNovyKlic(klic, sul)) return 0;
-    } else if (jeSifrovany(*obsah)) {
-        while (true) {
+
+        Seznam* existujici = nullptr;
+        for (auto& seznam : stav.seznamy) {
+            if (seznam.nazev == nazev) existujici = &seznam;
+        }
+
+        if (existujici) {
+            std::optional<std::string> obsah =
+                nactiObsahSouboru(cestaSeznamu(adresar, nazev));
+            if (!obsah) {
+                std::cout << "Soubor seznamu nelze precist.\n";
+                continue;
+            }
             std::optional<std::string> heslo = prectiHeslo("Heslo: ");
             if (!heslo) return 0;
             std::optional<VysledekDesifrovani> vysledek = desifruj(*obsah, *heslo);
             sodium_memzero(heslo->data(), heslo->size());
-            if (vysledek) {
-                stav = parsujSeznamy(vysledek->plaintext);
-                klic = std::move(vysledek->klic);
-                sul = vysledek->sul;
-                break;
+            if (!vysledek) {
+                std::cout << "Spatne heslo nebo poskozeny soubor, zkus to znovu.\n";
+                continue;
             }
-            std::cout << "Spatne heslo nebo poskozeny soubor, zkus to znovu.\n";
+            existujici->ukoly = parsujUkoly(vysledek->plaintext);
+            existujici->klic = std::move(vysledek->klic);
+            existujici->sul = vysledek->sul;
+            existujici->odemceno = true;
+            stav.aktivniId = existujici->id;
+            break;
         }
-    } else {
-        std::cout << "Soubor " << zdroj << " je v nesifrovanem formatu a bude zasifrovan.\n";
-        stav = parsujSeznamy(*obsah);
-        if (!nastavNovyKlic(klic, sul)) return 0;
+
+        std::cout << "Seznam '" << nazev << "' neexistuje. Zalozit? (a/n) " << std::flush;
+        std::string odpoved;
+        if (!std::getline(std::cin, odpoved)) return 0;
+        if (odpoved != "a") continue;
+        Seznam novy;
+        novy.id = stav.seznamy.empty() ? 1 : stav.seznamy.back().id + 1;
+        novy.nazev = nazev;
+        if (!nastavNovyKlic(novy.klic, novy.sul)) return 0;
+        stav.seznamy.push_back(std::move(novy));
+        stav.aktivniId = stav.seznamy.back().id;
+        break;
     }
 
     std::string radek;
     std::string zprava;
     std::optional<StavSeznamu> predchozi;
 
+    std::set<std::string> odemceneNazvy;  // pro mazání souborů odstraněných seznamů
+    for (const auto& seznam : stav.seznamy) {
+        if (seznam.odemceno) odemceneNazvy.insert(seznam.nazev);
+    }
+    std::string posledniAktivni = nastaveni.posledni;
+
+    // Uloží všechny odemčené trezory, smaže soubory odstraněných seznamů
+    // a zapíše nastavení. false = některý zápis selhal.
+    auto ulozVse = [&]() -> bool {
+        bool ok = true;
+        for (const auto& seznam : stav.seznamy) {
+            if (!seznam.odemceno) continue;
+            if (ulozSeznamDoSouboru(seznam, cestaSeznamu(adresar, seznam.nazev))) {
+                odemceneNazvy.insert(seznam.nazev);
+            } else {
+                ok = false;
+            }
+        }
+        for (const auto& nazev : odemceneNazvy) {
+            bool existuje = false;
+            for (const auto& seznam : stav.seznamy) {
+                if (seznam.nazev == nazev) existuje = true;
+            }
+            if (!existuje) std::remove(cestaSeznamu(adresar, nazev).c_str());
+        }
+        nastaveni.razeni = stav.razeni;
+        if (!posledniAktivni.empty()) nastaveni.posledni = posledniAktivni;
+        std::ofstream vystup(cestaNastaveni(adresar), std::ios::binary);
+        vystup << serializujNastaveni(nastaveni);
+        return ok;
+    };
+
     // Cílový seznam úkolového příkazu: složené ID > aktivní seznam; v přehledu
     // 0 je složené ID povinné. Při neúspěchu nastaví zprávu a vrátí nullptr.
     auto najdiCilUkolu = [&stav](const Prikaz& prikaz, std::string& zprava) -> Seznam* {
+        Seznam* seznam = nullptr;
         if (prikaz.seznamUkolu != -1) {
-            Seznam* seznam = najdiSeznam(stav.seznamy, prikaz.seznamUkolu);
+            seznam = najdiSeznam(stav.seznamy, prikaz.seznamUkolu);
             if (!seznam) {
                 zprava = "Seznam s ID " + std::to_string(prikaz.seznamUkolu) + " nenalezen.";
+                return nullptr;
             }
-            return seznam;
-        }
-        if (stav.aktivniId == 0) {
+        } else if (stav.aktivniId == 0) {
             zprava = "V prehledu pouzij ID ve tvaru <seznam>.<ukol>, napr. o 2.3.";
             return nullptr;
+        } else {
+            seznam = najdiSeznam(stav.seznamy, stav.aktivniId);
         }
-        return najdiSeznam(stav.seznamy, stav.aktivniId);
+        if (seznam && !seznam->odemceno) {
+            zprava = "Seznam '" + seznam->nazev + "' je zamceny, nejdriv ho odemkni (v "
+                     + std::to_string(seznam->id) + ").";
+            return nullptr;
+        }
+        return seznam;
     };
     while (true) {
+        if (stav.aktivniId != 0) {
+            posledniAktivni = najdiSeznam(stav.seznamy, stav.aktivniId)->nazev;
+        }
         std::cout << "\033[2J\033[H";
         vykresliObrazovku(std::cout, stav, zprava, sirkaTerminalu());
         if (!std::getline(std::cin, radek)) break;
@@ -173,6 +339,7 @@ int main() {
             prikaz.typ != TypPrikazu::Zpet && prikaz.typ != TypPrikazu::Ulozit &&
             prikaz.typ != TypPrikazu::Napoveda && prikaz.typ != TypPrikazu::ZmenaHesla &&
             prikaz.typ != TypPrikazu::Neznamy;
+        bool preskocSnapshot = false;
         StavSeznamu zaloha;
         if (sledovatZmenu) zaloha = stav;
 
@@ -243,6 +410,12 @@ int main() {
             case TypPrikazu::PresunoutUkol: {
                 Seznam* zdroj = najdiCilUkolu(prikaz, zprava);
                 if (!zdroj) break;
+                Seznam* cilovySeznam = najdiSeznam(stav.seznamy, prikaz.id2);
+                if (cilovySeznam && !cilovySeznam->odemceno) {
+                    zprava = "Seznam '" + cilovySeznam->nazev + "' je zamceny, nejdriv ho odemkni (v "
+                             + std::to_string(cilovySeznam->id) + ").";
+                    break;
+                }
                 int zdrojId = (prikaz.seznamUkolu != -1) ? prikaz.seznamUkolu : stav.aktivniId;
                 switch (presunUkol(stav, zdrojId, prikaz.id, prikaz.id2)) {
                     case 0:
@@ -276,38 +449,95 @@ int main() {
                 break;
             }
             case TypPrikazu::Ulozit:
-                zprava = ulozSeznamy(stav, soubor, klic, sul)
+                zprava = ulozVse()
                              ? "Ukoly ulozeny."
                              : "CHYBA: Ulozeni se nezdarilo, zkus to znovu.";
                 break;
-            case TypPrikazu::NovySeznam:
+            case TypPrikazu::NovySeznam: {
                 zprava = zkontrolujNazevSeznamu(prikaz.popis);
-                if (zprava.empty()) {
-                    pridatSeznam(stav, prikaz.popis);
-                    zprava = "Seznam '" + prikaz.popis + "' zalozen.";
+                if (!zprava.empty()) break;
+                bool obsazeny = false;
+                for (const auto& seznam : stav.seznamy) {
+                    if (seznam.nazev == prikaz.popis) obsazeny = true;
                 }
-                break;
-            case TypPrikazu::VybratSeznam:
-                if (vybratSeznam(stav, prikaz.id)) {
-                    zprava = (stav.aktivniId == 0)
-                                 ? "Prepnuto na prehled 'Vse'."
-                                 : "Prepnuto na seznam '"
-                                   + najdiSeznam(stav.seznamy, stav.aktivniId)->nazev + "'.";
-                } else {
-                    zprava = "Seznam s ID " + std::to_string(prikaz.id) + " nenalezen.";
-                }
-                break;
-            case TypPrikazu::PrejmenovatSeznam:
-                zprava = zkontrolujNazevSeznamu(prikaz.popis);
-                if (!zprava.empty()) {
+                if (obsazeny) {
+                    zprava = "Seznam '" + prikaz.popis + "' uz existuje.";
                     break;
                 }
-                if (prejmenovatSeznam(stav.seznamy, prikaz.id, prikaz.popis)) {
-                    zprava = "Seznam prejmenovan na '" + prikaz.popis + "'.";
-                } else {
+                std::vector<unsigned char> novyKlic;
+                std::array<unsigned char, crypto_pwhash_SALTBYTES> novaSul{};
+                if (!nastavNovyKlic(novyKlic, novaSul)) {
+                    zprava = "Zalozeni zruseno.";
+                    break;
+                }
+                pridatSeznam(stav, prikaz.popis);
+                stav.seznamy.back().klic = std::move(novyKlic);
+                stav.seznamy.back().sul = novaSul;
+                odemceneNazvy.insert(prikaz.popis);
+                zprava = "Seznam '" + prikaz.popis + "' zalozen.";
+                break;
+            }
+            case TypPrikazu::VybratSeznam: {
+                if (prikaz.id == 0) {
+                    vybratSeznam(stav, 0);
+                    zprava = "Prepnuto na prehled 'Vse'.";
+                    break;
+                }
+                Seznam* cil = najdiSeznam(stav.seznamy, prikaz.id);
+                if (!cil) {
                     zprava = "Seznam s ID " + std::to_string(prikaz.id) + " nenalezen.";
+                    break;
+                }
+                if (!cil->odemceno) {
+                    preskocSnapshot = true;  // odemceni neni vratne pres u
+                    std::optional<std::string> heslo =
+                        prectiHeslo("Heslo pro '" + cil->nazev + "': ");
+                    if (!heslo || heslo->empty()) {
+                        zprava = "Odemknuti zruseno.";
+                        break;
+                    }
+                    std::optional<std::string> obsah =
+                        nactiObsahSouboru(cestaSeznamu(adresar, cil->nazev));
+                    std::optional<VysledekDesifrovani> vysledek =
+                        obsah ? desifruj(*obsah, *heslo) : std::nullopt;
+                    sodium_memzero(heslo->data(), heslo->size());
+                    if (!vysledek) {
+                        zprava = "Spatne heslo.";
+                        break;
+                    }
+                    cil->ukoly = parsujUkoly(vysledek->plaintext);
+                    cil->klic = std::move(vysledek->klic);
+                    cil->sul = vysledek->sul;
+                    cil->odemceno = true;
+                    odemceneNazvy.insert(cil->nazev);
+                }
+                stav.aktivniId = cil->id;
+                zprava = "Prepnuto na seznam '" + cil->nazev + "'.";
+                break;
+            }
+            case TypPrikazu::PrejmenovatSeznam: {
+                zprava = zkontrolujNazevSeznamu(prikaz.popis);
+                if (!zprava.empty()) break;
+                bool obsazeny = false;
+                for (const auto& seznam : stav.seznamy) {
+                    if (seznam.nazev == prikaz.popis) obsazeny = true;
+                }
+                if (obsazeny) {
+                    zprava = "Seznam '" + prikaz.popis + "' uz existuje.";
+                    break;
+                }
+                Seznam* cil = najdiSeznam(stav.seznamy, prikaz.id);
+                if (!cil) {
+                    zprava = "Seznam s ID " + std::to_string(prikaz.id) + " nenalezen.";
+                } else if (!cil->odemceno) {
+                    zprava = "Seznam '" + cil->nazev + "' je zamceny, nejdriv ho odemkni (v "
+                             + std::to_string(cil->id) + ").";
+                } else {
+                    cil->nazev = prikaz.popis;
+                    zprava = "Seznam prejmenovan na '" + prikaz.popis + "'.";
                 }
                 break;
+            }
             case TypPrikazu::SmazatSeznam: {
                 if (prikaz.id == -1 && stav.aktivniId == 0) {
                     zprava = "V prehledu neni aktivni seznam ke smazani.";
@@ -315,30 +545,42 @@ int main() {
                 }
                 int cil = (prikaz.id == -1) ? stav.aktivniId : prikaz.id;
                 const Seznam* mazany = najdiSeznam(stav.seznamy, cil);
-                if (mazany) {
+                if (!mazany) {
+                    zprava = "Seznam s ID " + std::to_string(cil) + " nenalezen.";
+                } else if (!mazany->odemceno) {
+                    zprava = "Seznam '" + mazany->nazev + "' je zamceny, nejdriv ho odemkni (v "
+                             + std::to_string(mazany->id) + ").";
+                } else {
                     std::string nazev = mazany->nazev;
                     smazatSeznam(stav, cil);
                     zprava = "Seznam '" + nazev + "' smazan.";
-                } else {
-                    zprava = "Seznam s ID " + std::to_string(cil) + " nenalezen.";
                 }
                 break;
             }
             case TypPrikazu::ZmenaHesla: {
+                if (stav.aktivniId == 0) {
+                    zprava = "Prepni na konkretni seznam.";
+                    break;
+                }
+                Seznam* aktivni = najdiSeznam(stav.seznamy, stav.aktivniId);
                 std::vector<unsigned char> novyKlic;
                 std::array<unsigned char, crypto_pwhash_SALTBYTES> novaSul{};
-                if (nastavNovyKlic(novyKlic, novaSul)) {
-                    if (ulozSeznamy(stav, soubor, novyKlic, novaSul)) {
-                        klic = std::move(novyKlic);
-                        sul = novaSul;
-                        zprava = "Heslo zmeneno a ulozeno.";
-                    } else {
-                        // Nový klíč se zahazuje — jinak by pozdější úspěšné
-                        // uložení tiše přešifrovalo soubor novým heslem.
-                        zprava = "CHYBA: Ulozeni se nezdarilo, plati stare heslo.";
-                    }
-                } else {
+                if (!nastavNovyKlic(novyKlic, novaSul)) {
                     zprava = "Zmena hesla zrusena.";
+                    break;
+                }
+                std::vector<unsigned char> staryKlic = aktivni->klic;
+                std::array<unsigned char, crypto_pwhash_SALTBYTES> staraSul = aktivni->sul;
+                aktivni->klic = std::move(novyKlic);
+                aktivni->sul = novaSul;
+                if (ulozSeznamDoSouboru(*aktivni, cestaSeznamu(adresar, aktivni->nazev))) {
+                    zprava = "Heslo zmeneno a ulozeno.";
+                } else {
+                    // Nový klíč se zahazuje — jinak by pozdější úspěšné
+                    // uložení tiše přešifrovalo soubor novým heslem.
+                    aktivni->klic = std::move(staryKlic);
+                    aktivni->sul = staraSul;
+                    zprava = "CHYBA: Ulozeni se nezdarilo, plati stare heslo.";
                 }
                 break;
             }
@@ -367,13 +609,14 @@ int main() {
                 zprava = "Neznamy prikaz.";
                 break;
         }
-        if (sledovatZmenu && serializujSeznamy(zaloha) != serializujSeznamy(stav)) {
+        if (sledovatZmenu && !preskocSnapshot
+            && serializujSeznamy(zaloha) != serializujSeznamy(stav)) {
             predchozi = std::move(zaloha);
         }
         if (prikaz.typ == TypPrikazu::Konec) break;
     }
 
-    if (ulozSeznamy(stav, soubor, klic, sul)) {
+    if (ulozVse()) {
         std::cout << "\nUkoly ulozeny. Nashledanou.\n";
         return 0;
     }
