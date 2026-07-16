@@ -373,6 +373,29 @@ inline Prikaz rozeberPrikaz(const std::string& radek) {
     return prikaz;
 }
 
+inline void vytiskniNapovedu(std::ostream& out) {
+    out << "TODOLIST(1)                        Napoveda\n"
+           "\n"
+           "PRIKAZY UKOLU\n"
+           "  p <popis>        Prida novy ukol do aktivniho seznamu.\n"
+           "  o <id>           Oznaci ukol jako hotovy.\n"
+           "  r <id>           Odebere ukol ze seznamu.\n"
+           "\n"
+           "PRIKAZY SEZNAMU\n"
+           "  n <nazev>        Zalozi novy seznam a prepne na nej.\n"
+           "  v <id>           Prepne na seznam podle ID.\n"
+           "  j <id> <nazev>   Prejmenuje seznam.\n"
+           "  d                Smaze aktivni seznam (bez potvrzeni!).\n"
+           "  d <id>           Smaze seznam podle ID.\n"
+           "\n"
+           "OSTATNI\n"
+           "  s                Ulozi vsechny seznamy.\n"
+           "  q                Ulozi a ukonci program.\n"
+           "  h                Zobrazi tuto napovedu.\n"
+           "\n"
+           "Pokracuj stiskem Enteru...\n";
+}
+
 inline void vytiskniSeznamy(std::ostream& out, const StavSeznamu& stav) {
     out << "Seznamy: ";
     for (size_t i = 0; i < stav.seznamy.size(); ++i) {
@@ -404,6 +427,6 @@ inline void vykresliObrazovku(std::ostream& out,
     if (!zprava.empty()) {
         out << zprava << "\n\n";
     }
-    out << "Prikazy: p <popis> | o <id> | r <id> | n <nazev> | v <id> | j <id> <nazev> | d [id] | s | q\n"
+    out << "Prikazy: p <popis> | o <id> | r <id> | n <nazev> | v <id> | j <id> <nazev> | d [id] | s | q | h\n"
         << "> ";
 }

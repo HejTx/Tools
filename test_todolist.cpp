@@ -112,6 +112,32 @@ void test_vytiskni_seznamy() {
         "Seznamy: [1] Nakup (50.0%) | \033[1m>[2] Ukoly EQ tyden (0.0%)<\033[0m\n");
 }
 
+void test_vytiskni_napovedu() {
+    std::ostringstream out;
+    vytiskniNapovedu(out);
+    assert(out.str() ==
+        "TODOLIST(1)                        Napoveda\n"
+        "\n"
+        "PRIKAZY UKOLU\n"
+        "  p <popis>        Prida novy ukol do aktivniho seznamu.\n"
+        "  o <id>           Oznaci ukol jako hotovy.\n"
+        "  r <id>           Odebere ukol ze seznamu.\n"
+        "\n"
+        "PRIKAZY SEZNAMU\n"
+        "  n <nazev>        Zalozi novy seznam a prepne na nej.\n"
+        "  v <id>           Prepne na seznam podle ID.\n"
+        "  j <id> <nazev>   Prejmenuje seznam.\n"
+        "  d                Smaze aktivni seznam (bez potvrzeni!).\n"
+        "  d <id>           Smaze seznam podle ID.\n"
+        "\n"
+        "OSTATNI\n"
+        "  s                Ulozi vsechny seznamy.\n"
+        "  q                Ulozi a ukonci program.\n"
+        "  h                Zobrazi tuto napovedu.\n"
+        "\n"
+        "Pokracuj stiskem Enteru...\n");
+}
+
 void test_vykresli_prazdny_seznam() {
     StavSeznamu stav;
     stav.seznamy = {{1, "Ukoly", {}}};
@@ -123,7 +149,7 @@ void test_vykresli_prazdny_seznam() {
         "=== Ukoly ===\n"
         "Zadne ukoly.\n"
         "\n"
-        "Prikazy: p <popis> | o <id> | r <id> | n <nazev> | v <id> | j <id> <nazev> | d [id] | s | q\n"
+        "Prikazy: p <popis> | o <id> | r <id> | n <nazev> | v <id> | j <id> <nazev> | d [id] | s | q | h\n"
         "> ");
 }
 
@@ -139,7 +165,7 @@ void test_vykresli_ukoly_hotovy_sede() {
         "\033[90mID: 1, Popis: nakoupit, Dokonceno: Ano\033[0m\n"
         "ID: 2, Popis: uklidit, Dokonceno: Ne\n"
         "\n"
-        "Prikazy: p <popis> | o <id> | r <id> | n <nazev> | v <id> | j <id> <nazev> | d [id] | s | q\n"
+        "Prikazy: p <popis> | o <id> | r <id> | n <nazev> | v <id> | j <id> <nazev> | d [id] | s | q | h\n"
         "> ");
 }
 
@@ -156,7 +182,7 @@ void test_vykresli_se_zpravou() {
         "\n"
         "Ukol pridan.\n"
         "\n"
-        "Prikazy: p <popis> | o <id> | r <id> | n <nazev> | v <id> | j <id> <nazev> | d [id] | s | q\n"
+        "Prikazy: p <popis> | o <id> | r <id> | n <nazev> | v <id> | j <id> <nazev> | d [id] | s | q | h\n"
         "> ");
 }
 
@@ -377,6 +403,7 @@ int main() {
     test_smazat_prikaz();
     test_napoveda_prikaz();
     test_neznamy_prikaz();
+    test_vytiskni_napovedu();
     test_vytiskni_seznamy();
     test_vykresli_prazdny_seznam();
     test_vykresli_ukoly_hotovy_sede();
