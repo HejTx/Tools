@@ -13,7 +13,7 @@ std::string cestaKSouboru() {
     std::filesystem::path zaklad;
     const char* xdg = std::getenv("XDG_DATA_HOME");
     const char* home = std::getenv("HOME");
-    if (xdg && *xdg) {
+    if (xdg && xdg[0] == '/') {  // relativní XDG_DATA_HOME se dle XDG spec ignoruje
         zaklad = xdg;
     } else if (home && *home) {
         zaklad = std::filesystem::path(home) / ".local" / "share";
@@ -114,9 +114,11 @@ int main() {
     std::array<unsigned char, crypto_pwhash_SALTBYTES> sul{};
 
     std::optional<std::string> obsah = nactiObsahSouboru(soubor);
+    std::string zdroj = soubor;  // odkud data skutečně přišla (kvůli hláškám)
     if (!obsah && soubor != "ukoly.txt") {
         obsah = nactiObsahSouboru("ukoly.txt");
         if (obsah) {
+            zdroj = "ukoly.txt";
             std::cout << "Soubor ukoly.txt z aktualniho adresare byl nacten; nove se uklada do "
                       << soubor << ".\n";
         }
@@ -140,7 +142,7 @@ int main() {
             std::cout << "Spatne heslo nebo poskozeny soubor, zkus to znovu.\n";
         }
     } else {
-        std::cout << "Soubor " << soubor << " je v nesifrovanem formatu a bude zasifrovan.\n";
+        std::cout << "Soubor " << zdroj << " je v nesifrovanem formatu a bude zasifrovan.\n";
         stav = parsujSeznamy(*obsah);
         if (!nastavNovyKlic(klic, sul)) return 0;
     }
@@ -272,11 +274,15 @@ int main() {
                 std::vector<unsigned char> novyKlic;
                 std::array<unsigned char, crypto_pwhash_SALTBYTES> novaSul{};
                 if (nastavNovyKlic(novyKlic, novaSul)) {
-                    klic = std::move(novyKlic);
-                    sul = novaSul;
-                    zprava = ulozSeznamy(stav, soubor, klic, sul)
-                                 ? "Heslo zmeneno a ulozeno."
-                                 : "CHYBA: Ulozeni se nezdarilo, zkus to znovu.";
+                    if (ulozSeznamy(stav, soubor, novyKlic, novaSul)) {
+                        klic = std::move(novyKlic);
+                        sul = novaSul;
+                        zprava = "Heslo zmeneno a ulozeno.";
+                    } else {
+                        // Nový klíč se zahazuje — jinak by pozdější úspěšné
+                        // uložení tiše přešifrovalo soubor novým heslem.
+                        zprava = "CHYBA: Ulozeni se nezdarilo, plati stare heslo.";
+                    }
                 } else {
                     zprava = "Zmena hesla zrusena.";
                 }

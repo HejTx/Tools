@@ -202,7 +202,8 @@ void test_vykresli_prazdny_seznam() {
         "Zadne ukoly.\n"
         "\n"
         "\033[90mukol: p pridat · o hotovo · r odebrat · e upravit · m presunout · c uklidit\n"
-        "seznam: n novy · v vybrat · j prejmenovat · d smazat | u zpet · s ulozit · q konec · h napoveda\033[0m\n"
+        "seznam: n novy · v vybrat · j prejmenovat · d smazat\n"
+        "jine: u zpet · s ulozit · zh heslo · q konec · h napoveda\033[0m\n"
         "> ");
 }
 
@@ -219,7 +220,8 @@ void test_vykresli_ukoly_hotovy_sede() {
         "ID: 2, Popis: uklidit, Dokonceno: Ne\n"
         "\n"
         "\033[90mukol: p pridat · o hotovo · r odebrat · e upravit · m presunout · c uklidit\n"
-        "seznam: n novy · v vybrat · j prejmenovat · d smazat | u zpet · s ulozit · q konec · h napoveda\033[0m\n"
+        "seznam: n novy · v vybrat · j prejmenovat · d smazat\n"
+        "jine: u zpet · s ulozit · zh heslo · q konec · h napoveda\033[0m\n"
         "> ");
 }
 
@@ -237,7 +239,8 @@ void test_vykresli_se_zpravou() {
         "Ukol pridan.\n"
         "\n"
         "\033[90mukol: p pridat · o hotovo · r odebrat · e upravit · m presunout · c uklidit\n"
-        "seznam: n novy · v vybrat · j prejmenovat · d smazat | u zpet · s ulozit · q konec · h napoveda\033[0m\n"
+        "seznam: n novy · v vybrat · j prejmenovat · d smazat\n"
+        "jine: u zpet · s ulozit · zh heslo · q konec · h napoveda\033[0m\n"
         "> ");
 }
 
@@ -429,6 +432,7 @@ void test_presun_ukolu() {
     assert(stav.seznamy[1].ukoly[1].description == "prvni");
     assert(stav.seznamy[1].ukoly[1].done == true);     // done se zachova
     assert(presunUkol(stav, 99, 2) == 1);              // ukol nenalezen
+    assert(presunUkol(stav, 99, 1) == 1);              // neexistence ukolu ma prednost
     assert(presunUkol(stav, 2, 99) == 2);              // seznam nenalezen
     assert(presunUkol(stav, 2, 1) == 3);               // cil = aktivni
 }
