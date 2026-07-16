@@ -123,6 +123,58 @@ void test_parsovani_preskoci_prazdne_radky() {
     assert(zpet[1].description == "b" && zpet[1].done == true);
 }
 
+void test_serializace_seznamu() {
+    StavSeznamu stav;
+    stav.aktivniId = 2;
+    stav.seznamy = {
+        {1, "Nakup", {{1, "mleko", false}, {2, "chleba", true}}},
+        {2, "Prace", {}},
+    };
+    assert(serializujSeznamy(stav) ==
+        "@aktivni;2\n"
+        "#seznam;1;Nakup\n"
+        "1;mleko;0\n"
+        "2;chleba;1\n"
+        "#seznam;2;Prace\n");
+}
+
+void test_parsovani_seznamu_roundtrip() {
+    StavSeznamu stav;
+    stav.aktivniId = 2;
+    stav.seznamy = {
+        {1, "Nakup", {{1, "mleko", false}, {2, "chleba", true}}},
+        {2, "Ukoly EQ tyden", {}},
+    };
+    StavSeznamu zpet = parsujSeznamy(serializujSeznamy(stav));
+    assert(zpet.aktivniId == 2);
+    assert(zpet.seznamy.size() == 2);
+    assert(zpet.seznamy[0].id == 1 && zpet.seznamy[0].nazev == "Nakup");
+    assert(zpet.seznamy[0].ukoly.size() == 2);
+    assert(zpet.seznamy[0].ukoly[1].description == "chleba" && zpet.seznamy[0].ukoly[1].done);
+    assert(zpet.seznamy[1].id == 2 && zpet.seznamy[1].nazev == "Ukoly EQ tyden");
+    assert(zpet.seznamy[1].ukoly.empty());
+}
+
+void test_migrace_stareho_formatu() {
+    StavSeznamu stav = parsujSeznamy("1;nakoupit;1\n2;uklidit;0\n");
+    assert(stav.seznamy.size() == 1);
+    assert(stav.seznamy[0].id == 1 && stav.seznamy[0].nazev == "Ukoly");
+    assert(stav.seznamy[0].ukoly.size() == 2);
+    assert(stav.aktivniId == 1);
+}
+
+void test_parsovani_prazdneho_obsahu() {
+    StavSeznamu stav = parsujSeznamy("");
+    assert(stav.seznamy.size() == 1);
+    assert(stav.seznamy[0].nazev == "Ukoly" && stav.seznamy[0].ukoly.empty());
+    assert(stav.aktivniId == 1);
+}
+
+void test_neplatne_aktivni_id() {
+    StavSeznamu stav = parsujSeznamy("@aktivni;99\n#seznam;3;Prace\n1;report;0\n");
+    assert(stav.aktivniId == 3);  // neexistující ID -> první seznam
+}
+
 void test_sifrovani_roundtrip() {
     std::array<unsigned char, crypto_pwhash_SALTBYTES> sul;
     randombytes_buf(sul.data(), sul.size());
@@ -202,6 +254,11 @@ int main() {
     test_serializace_format();
     test_parsovani_roundtrip();
     test_parsovani_preskoci_prazdne_radky();
+    test_serializace_seznamu();
+    test_parsovani_seznamu_roundtrip();
+    test_migrace_stareho_formatu();
+    test_parsovani_prazdneho_obsahu();
+    test_neplatne_aktivni_id();
     test_sifrovani_roundtrip();
     test_sifrovani_prazdny_plaintext();
     test_spatne_heslo();

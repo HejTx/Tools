@@ -62,6 +62,99 @@ inline std::vector<Task> parsujUkoly(const std::string& obsah) {
     return ukoly;
 }
 
+struct Seznam {
+    int id;
+    std::string nazev;
+    std::vector<Task> ukoly;
+};
+
+struct StavSeznamu {
+    std::vector<Seznam> seznamy;
+    int aktivniId = 1;
+};
+
+inline Seznam* najdiSeznam(std::vector<Seznam>& seznamy, int id) {
+    for (auto& seznam : seznamy) {
+        if (seznam.id == id) return &seznam;
+    }
+    return nullptr;
+}
+
+inline const Seznam* najdiSeznam(const std::vector<Seznam>& seznamy, int id) {
+    for (const auto& seznam : seznamy) {
+        if (seznam.id == id) return &seznam;
+    }
+    return nullptr;
+}
+
+inline std::string serializujSeznamy(const StavSeznamu& stav) {
+    std::ostringstream out;
+    out << "@aktivni;" << stav.aktivniId << "\n";
+    for (const auto& seznam : stav.seznamy) {
+        out << "#seznam;" << seznam.id << ";" << seznam.nazev << "\n"
+            << serializujUkoly(seznam.ukoly);
+    }
+    return out.str();
+}
+
+// Rozparsuje nový formát; obsah bez hlavičky @aktivni je starý jednoseznamový
+// formát a zmigruje se na jeden seznam "Ukoly". Vždy vrátí aspoň jeden seznam
+// a aktivniId ukazující na existující seznam.
+inline StavSeznamu parsujSeznamy(const std::string& obsah) {
+    StavSeznamu stav;
+
+    if (obsah.rfind("@aktivni;", 0) != 0) {
+        stav.seznamy.push_back({1, "Ukoly", parsujUkoly(obsah)});
+        return stav;
+    }
+
+    std::istringstream in(obsah);
+    std::string line;
+    std::getline(in, line);
+    try {
+        stav.aktivniId = std::stoi(line.substr(std::string("@aktivni;").size()));
+    } catch (...) {}
+
+    std::string bufferUkolu;
+    auto uzavriSeznam = [&]() {
+        if (!stav.seznamy.empty()) {
+            stav.seznamy.back().ukoly = parsujUkoly(bufferUkolu);
+        }
+        bufferUkolu.clear();
+    };
+
+    while (std::getline(in, line)) {
+        if (line.rfind("#seznam;", 0) == 0) {
+            uzavriSeznam();
+            std::istringstream ss(line);
+            std::string prefix, idStr, nazev;
+            std::getline(ss, prefix, ';');
+            std::getline(ss, idStr, ';');
+            std::getline(ss, nazev);
+            Seznam seznam;
+            try {
+                seznam.id = std::stoi(idStr);
+            } catch (...) {
+                seznam.id = stav.seznamy.empty() ? 1 : stav.seznamy.back().id + 1;
+            }
+            seznam.nazev = nazev;
+            stav.seznamy.push_back(std::move(seznam));
+        } else {
+            bufferUkolu += line;
+            bufferUkolu += "\n";
+        }
+    }
+    uzavriSeznam();
+
+    if (stav.seznamy.empty()) {
+        stav.seznamy.push_back({1, "Ukoly", {}});
+    }
+    if (najdiSeznam(stav.seznamy, stav.aktivniId) == nullptr) {
+        stav.aktivniId = stav.seznamy.front().id;
+    }
+    return stav;
+}
+
 // Uloží úkoly zašifrovaně (stejný klíč a sůl, nová nonce při každém zápisu).
 // Zapisuje přes dočasný soubor a rename, aby selhání zápisu nezničilo původní data.
 inline void ulozUkoly(const std::vector<Task>& ukoly, const std::string& soubor,
