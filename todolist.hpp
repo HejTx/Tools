@@ -361,19 +361,37 @@ inline Prikaz rozeberPrikaz(const std::string& radek) {
     return prikaz;
 }
 
+inline void vytiskniSeznamy(std::ostream& out, const StavSeznamu& stav) {
+    out << "Seznamy: ";
+    for (size_t i = 0; i < stav.seznamy.size(); ++i) {
+        const Seznam& seznam = stav.seznamy[i];
+        if (i > 0) out << " | ";
+        std::string polozka = "[" + std::to_string(seznam.id) + "] " + seznam.nazev
+                              + " (" + formatujProcenta(seznam.ukoly) + ")";
+        if (seznam.id == stav.aktivniId) {
+            out << "\033[1m>" << polozka << "<\033[0m";
+        } else {
+            out << polozka;
+        }
+    }
+    out << "\n";
+}
+
 inline void vykresliObrazovku(std::ostream& out,
-                              const std::vector<Task>& ukoly,
+                              const StavSeznamu& stav,
                               const std::string& zprava) {
-    out << "=== Ukoly ===\n";
-    if (ukoly.empty()) {
+    vytiskniSeznamy(out, stav);
+    const Seznam* aktivni = najdiSeznam(stav.seznamy, stav.aktivniId);
+    out << "=== " << aktivni->nazev << " ===\n";
+    if (aktivni->ukoly.empty()) {
         out << "Zadne ukoly.\n";
     } else {
-        vytiskniUkoly(out, ukoly);
+        vytiskniUkoly(out, aktivni->ukoly);
     }
     out << "\n";
     if (!zprava.empty()) {
         out << zprava << "\n\n";
     }
-    out << "Prikazy: p <popis> | o <id> | r <id> | s (ulozit) | q (ulozit a konec)\n"
+    out << "Prikazy: p <popis> | o <id> | r <id> | n <nazev> | v <id> | j <id> <nazev> | d [id] | s | q\n"
         << "> ";
 }

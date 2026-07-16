@@ -91,40 +91,64 @@ void test_neznamy_prikaz() {
     assert(p.typ == TypPrikazu::Neznamy);
 }
 
-void test_vykresli_prazdny_seznam() {
+void test_vytiskni_seznamy() {
+    StavSeznamu stav;
+    stav.seznamy = {
+        {1, "Nakup", {{1, "mleko", true}, {2, "chleba", false}}},
+        {2, "Ukoly EQ tyden", {}},
+    };
+    stav.aktivniId = 2;
     std::ostringstream out;
-    vykresliObrazovku(out, {}, "");
+    vytiskniSeznamy(out, stav);
     assert(out.str() ==
+        "Seznamy: [1] Nakup (50.0%) | \033[1m>[2] Ukoly EQ tyden (0.0%)<\033[0m\n");
+}
+
+void test_vykresli_prazdny_seznam() {
+    StavSeznamu stav;
+    stav.seznamy = {{1, "Ukoly", {}}};
+    stav.aktivniId = 1;
+    std::ostringstream out;
+    vykresliObrazovku(out, stav, "");
+    assert(out.str() ==
+        "Seznamy: \033[1m>[1] Ukoly (0.0%)<\033[0m\n"
         "=== Ukoly ===\n"
         "Zadne ukoly.\n"
         "\n"
-        "Prikazy: p <popis> | o <id> | r <id> | s (ulozit) | q (ulozit a konec)\n"
+        "Prikazy: p <popis> | o <id> | r <id> | n <nazev> | v <id> | j <id> <nazev> | d [id] | s | q\n"
         "> ");
 }
 
 void test_vykresli_ukoly_hotovy_sede() {
+    StavSeznamu stav;
+    stav.seznamy = {{1, "Ukoly", {{1, "nakoupit", true}, {2, "uklidit", false}}}};
+    stav.aktivniId = 1;
     std::ostringstream out;
-    std::vector<Task> ukoly = {{1, "nakoupit", true}, {2, "uklidit", false}};
-    vykresliObrazovku(out, ukoly, "");
+    vykresliObrazovku(out, stav, "");
     assert(out.str() ==
+        "Seznamy: \033[1m>[1] Ukoly (50.0%)<\033[0m\n"
         "=== Ukoly ===\n"
         "\033[90mID: 1, Popis: nakoupit, Dokonceno: Ano\033[0m\n"
         "ID: 2, Popis: uklidit, Dokonceno: Ne\n"
         "\n"
-        "Prikazy: p <popis> | o <id> | r <id> | s (ulozit) | q (ulozit a konec)\n"
+        "Prikazy: p <popis> | o <id> | r <id> | n <nazev> | v <id> | j <id> <nazev> | d [id] | s | q\n"
         "> ");
 }
 
 void test_vykresli_se_zpravou() {
+    StavSeznamu stav;
+    stav.seznamy = {{1, "Ukoly", {}}};
+    stav.aktivniId = 1;
     std::ostringstream out;
-    vykresliObrazovku(out, {}, "Ukol pridan.");
+    vykresliObrazovku(out, stav, "Ukol pridan.");
     assert(out.str() ==
+        "Seznamy: \033[1m>[1] Ukoly (0.0%)<\033[0m\n"
         "=== Ukoly ===\n"
         "Zadne ukoly.\n"
         "\n"
         "Ukol pridan.\n"
         "\n"
-        "Prikazy: p <popis> | o <id> | r <id> | s (ulozit) | q (ulozit a konec)\n"
+        "Prikazy: p <popis> | o <id> | r <id> | n <nazev> | v <id> | j <id> <nazev> | d [id] | s | q\n"
         "> ");
 }
 
@@ -338,6 +362,7 @@ int main() {
     test_prejmenovat_prikaz();
     test_smazat_prikaz();
     test_neznamy_prikaz();
+    test_vytiskni_seznamy();
     test_vykresli_prazdny_seznam();
     test_vykresli_ukoly_hotovy_sede();
     test_vykresli_se_zpravou();
