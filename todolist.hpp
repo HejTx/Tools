@@ -288,7 +288,8 @@ inline bool oznacitUkolDokonceny(std::vector<Task>& ukoly, int id) {
 }
 
 enum class TypPrikazu { Pridat, Oznacit, Odebrat, Konec, Neznamy, Ulozit,
-                        NovySeznam, VybratSeznam, PrejmenovatSeznam, SmazatSeznam };
+                        NovySeznam, VybratSeznam, PrejmenovatSeznam, SmazatSeznam,
+                        Napoveda };
 
 struct Prikaz {
     TypPrikazu typ = TypPrikazu::Neznamy;
@@ -330,6 +331,8 @@ inline Prikaz rozeberPrikaz(const std::string& radek) {
         prikaz.typ = TypPrikazu::Konec;
     } else if (token == "s") {
         prikaz.typ = TypPrikazu::Ulozit;
+    } else if (token == "h") {
+        prikaz.typ = TypPrikazu::Napoveda;
     } else if (token == "p") {
         prikaz.typ = TypPrikazu::Pridat;
         prikaz.popis = zbytekRadku(ss);

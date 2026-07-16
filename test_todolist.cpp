@@ -89,6 +89,11 @@ void test_smazat_prikaz() {
     assert(rozeberPrikaz("d 0").typ == TypPrikazu::Neznamy);
 }
 
+void test_napoveda_prikaz() {
+    assert(rozeberPrikaz("h").typ == TypPrikazu::Napoveda);
+    assert(rozeberPrikaz("h cokoli").typ == TypPrikazu::Napoveda);  // zbytek se ignoruje
+}
+
 void test_neznamy_prikaz() {
     Prikaz p = rozeberPrikaz("xyz");
     assert(p.typ == TypPrikazu::Neznamy);
@@ -370,6 +375,7 @@ int main() {
     test_vybrat_seznam_prikaz();
     test_prejmenovat_prikaz();
     test_smazat_prikaz();
+    test_napoveda_prikaz();
     test_neznamy_prikaz();
     test_vytiskni_seznamy();
     test_vykresli_prazdny_seznam();
