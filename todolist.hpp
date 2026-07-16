@@ -193,11 +193,11 @@ inline bool smazatSeznam(StavSeznamu& stav, int id) {
     return true;
 }
 
-// Uloží úkoly zašifrovaně (stejný klíč a sůl, nová nonce při každém zápisu).
+// Uloží všechny seznamy zašifrovaně (stejný klíč a sůl, nová nonce při každém zápisu).
 // Zapisuje přes dočasný soubor a rename, aby selhání zápisu nezničilo původní data.
-inline void ulozUkoly(const std::vector<Task>& ukoly, const std::string& soubor,
-                      const std::vector<unsigned char>& klic,
-                      const std::array<unsigned char, crypto_pwhash_SALTBYTES>& sul) {
+inline void ulozSeznamy(const StavSeznamu& stav, const std::string& soubor,
+                        const std::vector<unsigned char>& klic,
+                        const std::array<unsigned char, crypto_pwhash_SALTBYTES>& sul) {
     const std::string docasny = soubor + ".tmp";
 
     std::ofstream out(docasny, std::ios::binary);
@@ -206,7 +206,7 @@ inline void ulozUkoly(const std::vector<Task>& ukoly, const std::string& soubor,
         return;
     }
 
-    out << zasifruj(serializujUkoly(ukoly), klic, sul);
+    out << zasifruj(serializujSeznamy(stav), klic, sul);
     out.flush();
     if (!out) {
         std::cerr << "Zapis do souboru " << docasny << " se nezdaril, puvodni data zustavaji.\n";

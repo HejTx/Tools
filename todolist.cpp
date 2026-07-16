@@ -69,13 +69,14 @@ int main() {
 
     const std::string soubor = "ukoly.txt";
 
-    std::vector<Task> ukoly;
+    StavSeznamu stav;
     std::vector<unsigned char> klic;
     std::array<unsigned char, crypto_pwhash_SALTBYTES> sul{};
 
     std::optional<std::string> obsah = nactiObsahSouboru(soubor);
     if (!obsah) {
         std::cout << "Soubor " << soubor << " neexistuje, zaklada se novy sifrovany seznam.\n";
+        stav = parsujSeznamy("");
         if (!nastavNovyKlic(klic, sul)) return 0;
     } else if (jeSifrovany(*obsah)) {
         while (true) {
@@ -84,7 +85,7 @@ int main() {
             std::optional<VysledekDesifrovani> vysledek = desifruj(*obsah, *heslo);
             sodium_memzero(heslo->data(), heslo->size());
             if (vysledek) {
-                ukoly = parsujUkoly(vysledek->plaintext);
+                stav = parsujSeznamy(vysledek->plaintext);
                 klic = std::move(vysledek->klic);
                 sul = vysledek->sul;
                 break;
@@ -93,7 +94,7 @@ int main() {
         }
     } else {
         std::cout << "Soubor " << soubor << " je v nesifrovanem formatu a bude zasifrovan.\n";
-        ukoly = parsujUkoly(*obsah);
+        stav = parsujSeznamy(*obsah);
         if (!nastavNovyKlic(klic, sul)) return 0;
     }
 
@@ -101,39 +102,81 @@ int main() {
     std::string zprava;
     while (true) {
         std::cout << "\033[2J\033[H";
-        vykresliObrazovku(std::cout, ukoly, zprava);
+        vykresliObrazovku(std::cout, stav, zprava);
         if (!std::getline(std::cin, radek)) break;
 
         Prikaz prikaz = rozeberPrikaz(radek);
         if (prikaz.typ == TypPrikazu::Konec) break;
 
+        Seznam* aktivni = najdiSeznam(stav.seznamy, stav.aktivniId);
         switch (prikaz.typ) {
             case TypPrikazu::Pridat:
                 if (prikaz.popis.find(';') != std::string::npos) {
                     zprava = "Popis nesmi obsahovat znak ';'.";
                 } else {
-                    pridatUkol(ukoly, prikaz.popis);
+                    pridatUkol(aktivni->ukoly, prikaz.popis);
                     zprava = "Ukol pridan.";
                 }
                 break;
             case TypPrikazu::Oznacit:
-                if (oznacitUkolDokonceny(ukoly, prikaz.id)) {
+                if (oznacitUkolDokonceny(aktivni->ukoly, prikaz.id)) {
                     zprava = "Ukol " + std::to_string(prikaz.id) + " oznacen jako hotovy.";
                 } else {
                     zprava = "Ukol s ID " + std::to_string(prikaz.id) + " nenalezen.";
                 }
                 break;
             case TypPrikazu::Odebrat:
-                if (odebratUkol(ukoly, prikaz.id)) {
+                if (odebratUkol(aktivni->ukoly, prikaz.id)) {
                     zprava = "Ukol " + std::to_string(prikaz.id) + " odebran.";
                 } else {
                     zprava = "Ukol s ID " + std::to_string(prikaz.id) + " nenalezen.";
                 }
                 break;
             case TypPrikazu::Ulozit:
-                ulozUkoly(ukoly, soubor, klic, sul);
+                ulozSeznamy(stav, soubor, klic, sul);
                 zprava = "Ukoly ulozeny.";
                 break;
+            case TypPrikazu::NovySeznam:
+                if (prikaz.popis.empty()) {
+                    zprava = "Nazev nesmi byt prazdny.";
+                } else if (prikaz.popis.find(';') != std::string::npos) {
+                    zprava = "Nazev nesmi obsahovat znak ';'.";
+                } else {
+                    pridatSeznam(stav, prikaz.popis);
+                    zprava = "Seznam '" + prikaz.popis + "' zalozen.";
+                }
+                break;
+            case TypPrikazu::VybratSeznam:
+                if (vybratSeznam(stav, prikaz.id)) {
+                    zprava = "Prepnuto na seznam '"
+                             + najdiSeznam(stav.seznamy, stav.aktivniId)->nazev + "'.";
+                } else {
+                    zprava = "Seznam s ID " + std::to_string(prikaz.id) + " nenalezen.";
+                }
+                break;
+            case TypPrikazu::PrejmenovatSeznam:
+                if (prikaz.popis.empty()) {
+                    zprava = "Nazev nesmi byt prazdny.";
+                } else if (prikaz.popis.find(';') != std::string::npos) {
+                    zprava = "Nazev nesmi obsahovat znak ';'.";
+                } else if (prejmenovatSeznam(stav.seznamy, prikaz.id, prikaz.popis)) {
+                    zprava = "Seznam prejmenovan na '" + prikaz.popis + "'.";
+                } else {
+                    zprava = "Seznam s ID " + std::to_string(prikaz.id) + " nenalezen.";
+                }
+                break;
+            case TypPrikazu::SmazatSeznam: {
+                int cil = (prikaz.id == -1) ? stav.aktivniId : prikaz.id;
+                const Seznam* mazany = najdiSeznam(stav.seznamy, cil);
+                if (mazany) {
+                    std::string nazev = mazany->nazev;
+                    smazatSeznam(stav, cil);
+                    zprava = "Seznam '" + nazev + "' smazan.";
+                } else {
+                    zprava = "Seznam s ID " + std::to_string(cil) + " nenalezen.";
+                }
+                break;
+            }
             case TypPrikazu::Konec:
                 break;
             default:
@@ -142,7 +185,7 @@ int main() {
         }
     }
 
-    ulozUkoly(ukoly, soubor, klic, sul);
+    ulozSeznamy(stav, soubor, klic, sul);
     std::cout << "\nUkoly ulozeny. Nashledanou.\n";
     return 0;
 }
