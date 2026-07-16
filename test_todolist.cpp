@@ -324,6 +324,10 @@ void test_klic_terminu() {
     assert(klicTerminu("19/07/26") > klicTerminu("18/07/26"));
     assert(klicTerminu("01/01/27") > klicTerminu("31/12/26"));
     assert(klicTerminu("") > klicTerminu("31/12/99"));  // bez terminu nakonec
+    // poškozený termín (ručně upravený soubor) nesmí shodit řazení
+    assert(klicTerminu("garbage!") == klicTerminu(""));
+    std::vector<Task> poskozene = {{1, "a", false, "xx/yy/zz"}, {2, "b", false, "18/07/26"}};
+    assert(serazeneUkoly(poskozene, 2)[0].id == 2);
 }
 
 void test_serializace_terminu() {

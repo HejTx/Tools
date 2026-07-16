@@ -30,9 +30,10 @@ inline bool jePlatnyTermin(const std::string& termin) {
     return den >= 1 && den <= 31 && mesic >= 1 && mesic <= 12;
 }
 
-// Porovnávací klíč rr*10000+mm*100+dd; bez termínu = max (řadí se nakonec).
+// Porovnávací klíč rr*10000+mm*100+dd; bez termínu (nebo poškozený,
+// např. z ručně upraveného souboru) = max, řadí se nakonec.
 inline int klicTerminu(const std::string& termin) {
-    if (termin.empty()) return std::numeric_limits<int>::max();
+    if (!jePlatnyTermin(termin)) return std::numeric_limits<int>::max();
     int den = std::stoi(termin.substr(0, 2));
     int mesic = std::stoi(termin.substr(3, 2));
     int rok = std::stoi(termin.substr(6, 2));
