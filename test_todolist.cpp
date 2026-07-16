@@ -325,6 +325,7 @@ void test_serializace_seznamu() {
     };
     assert(serializujSeznamy(stav) ==
         "@aktivni;2\n"
+        "@razeni;1\n"
         "#seznam;1;Nakup\n"
         "1;mleko;0;\n"
         "2;chleba;1;\n"
@@ -386,6 +387,48 @@ void test_uloz_seznamy_uspech_a_selhani() {
 
     // selhani: neexistujici adresar (hlaska na stderr je ocekavana)
     assert(!ulozSeznamy(stav, "neexistujici_adresar/ukoly.txt", klic, sul));
+}
+
+void test_razeni_roundtrip() {
+    StavSeznamu stav;
+    stav.seznamy = {{1, "A", {}}};
+    stav.aktivniId = 1;
+    stav.razeni = 2;
+    assert(serializujSeznamy(stav) == "@aktivni;1\n@razeni;2\n#seznam;1;A\n");
+    assert(parsujSeznamy(serializujSeznamy(stav)).razeni == 2);
+    // chybejici/neplatna hodnota -> 1
+    assert(parsujSeznamy("@aktivni;1\n#seznam;1;A\n").razeni == 1);
+    assert(parsujSeznamy("@aktivni;1\n@razeni;7\n#seznam;1;A\n").razeni == 1);
+}
+
+void test_serazene_ukoly() {
+    std::vector<Task> ukoly = {{1, "bez", false},
+                               {2, "pozdejsi", false, "20/08/26"},
+                               {3, "drivejsi", false, "18/07/26"}};
+    std::vector<Task> podleId = serazeneUkoly(ukoly, 1);
+    assert(podleId[0].id == 1 && podleId[2].id == 3);
+    std::vector<Task> podleTerminu = serazeneUkoly(ukoly, 2);
+    assert(podleTerminu[0].id == 3);  // nejblizsi termin prvni
+    assert(podleTerminu[1].id == 2);
+    assert(podleTerminu[2].id == 1);  // bez terminu nakonec
+}
+
+void test_sestav_prehled() {
+    StavSeznamu stav;
+    stav.seznamy = {
+        {1, "A", {{1, "a1", false}, {2, "a2", false, "20/08/26"}}},
+        {2, "B", {{1, "b1", false, "18/07/26"}}},
+    };
+    stav.razeni = 1;
+    std::vector<PolozkaPrehledu> podleId = sestavPrehled(stav);
+    assert(podleId.size() == 3);
+    assert(podleId[0].seznamId == 1 && podleId[0].ukol.id == 1);
+    assert(podleId[2].seznamId == 2);
+    stav.razeni = 2;
+    std::vector<PolozkaPrehledu> podleTerminu = sestavPrehled(stav);
+    assert(podleTerminu[0].seznamId == 2);              // 18/07 prvni
+    assert(podleTerminu[1].ukol.termin == "20/08/26");
+    assert(podleTerminu[2].ukol.termin == "");          // bez terminu nakonec
 }
 
 void test_pridat_seznam() {
@@ -576,6 +619,9 @@ int main() {
     test_migrace_stareho_formatu();
     test_parsovani_prazdneho_obsahu();
     test_neplatne_aktivni_id();
+    test_razeni_roundtrip();
+    test_serazene_ukoly();
+    test_sestav_prehled();
     test_uloz_seznamy_uspech_a_selhani();
     test_pridat_seznam();
     test_vybrat_seznam();

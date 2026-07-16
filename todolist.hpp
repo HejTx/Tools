@@ -39,16 +39,20 @@ inline int klicTerminu(const std::string& termin) {
     return rok * 10000 + mesic * 100 + den;
 }
 
-// Podíl hotových úkolů jako "50.0%"; prázdný seznam = "0.0%".
+// Podíl hotových úkolů jako "50.0%"; prázdno = "0.0%".
+inline std::string formatujProcenta(int hotovo, int celkem) {
+    double procenta = (celkem == 0) ? 0.0 : 100.0 * hotovo / celkem;
+    char buf[16];
+    std::snprintf(buf, sizeof(buf), "%.1f%%", procenta);
+    return buf;
+}
+
 inline std::string formatujProcenta(const std::vector<Task>& ukoly) {
     int hotovo = 0;
     for (const auto& ukol : ukoly) {
         if (ukol.done) ++hotovo;
     }
-    double procenta = ukoly.empty() ? 0.0 : 100.0 * hotovo / ukoly.size();
-    char buf[16];
-    std::snprintf(buf, sizeof(buf), "%.1f%%", procenta);
-    return buf;
+    return formatujProcenta(hotovo, static_cast<int>(ukoly.size()));
 }
 
 inline std::string serializujUkoly(const std::vector<Task>& ukoly) {
@@ -100,6 +104,7 @@ struct Seznam {
 struct StavSeznamu {
     std::vector<Seznam> seznamy;
     int aktivniId = 1;
+    int razeni = 1;  // 1 = podle ID, 2 = podle termínu
 };
 
 inline Seznam* najdiSeznam(std::vector<Seznam>& seznamy, int id) {
@@ -119,6 +124,7 @@ inline const Seznam* najdiSeznam(const std::vector<Seznam>& seznamy, int id) {
 inline std::string serializujSeznamy(const StavSeznamu& stav) {
     std::ostringstream out;
     out << "@aktivni;" << stav.aktivniId << "\n";
+    out << "@razeni;" << stav.razeni << "\n";
     for (const auto& seznam : stav.seznamy) {
         out << "#seznam;" << seznam.id << ";" << seznam.nazev << "\n"
             << serializujUkoly(seznam.ukoly);
@@ -153,6 +159,12 @@ inline StavSeznamu parsujSeznamy(const std::string& obsah) {
     };
 
     while (std::getline(in, line)) {
+        if (line.rfind("@razeni;", 0) == 0) {
+            try {
+                stav.razeni = std::stoi(line.substr(std::string("@razeni;").size()));
+            } catch (...) {}
+            continue;
+        }
         if (line.rfind("#seznam;", 0) == 0) {
             uzavriSeznam();
             std::istringstream ss(line);
@@ -181,6 +193,7 @@ inline StavSeznamu parsujSeznamy(const std::string& obsah) {
     if (najdiSeznam(stav.seznamy, stav.aktivniId) == nullptr) {
         stav.aktivniId = stav.seznamy.front().id;
     }
+    if (stav.razeni != 2) stav.razeni = 1;
     return stav;
 }
 
@@ -220,6 +233,46 @@ inline bool smazatSeznam(StavSeznamu& stav, int id) {
         stav.aktivniId = stav.seznamy.front().id;
     }
     return true;
+}
+
+// Kopie úkolů v zobrazovacím pořadí (1 = pořadí dat/ID, 2 = podle termínu).
+inline std::vector<Task> serazeneUkoly(const std::vector<Task>& ukoly, int razeni) {
+    std::vector<Task> vysledek = ukoly;
+    if (razeni == 2) {
+        std::stable_sort(vysledek.begin(), vysledek.end(), [](const Task& a, const Task& b) {
+            if (klicTerminu(a.termin) != klicTerminu(b.termin)) {
+                return klicTerminu(a.termin) < klicTerminu(b.termin);
+            }
+            return a.id < b.id;
+        });
+    }
+    return vysledek;
+}
+
+struct PolozkaPrehledu {
+    int seznamId;
+    Task ukol;
+};
+
+// Všechny úkoly napříč seznamy v zobrazovacím pořadí přehledu „Vše".
+inline std::vector<PolozkaPrehledu> sestavPrehled(const StavSeznamu& stav) {
+    std::vector<PolozkaPrehledu> polozky;
+    for (const auto& seznam : stav.seznamy) {
+        for (const auto& ukol : seznam.ukoly) {
+            polozky.push_back({seznam.id, ukol});
+        }
+    }
+    if (stav.razeni == 2) {
+        std::stable_sort(polozky.begin(), polozky.end(),
+                         [](const PolozkaPrehledu& a, const PolozkaPrehledu& b) {
+            if (klicTerminu(a.ukol.termin) != klicTerminu(b.ukol.termin)) {
+                return klicTerminu(a.ukol.termin) < klicTerminu(b.ukol.termin);
+            }
+            if (a.seznamId != b.seznamId) return a.seznamId < b.seznamId;
+            return a.ukol.id < b.ukol.id;
+        });
+    }
+    return polozky;
 }
 
 // Přesune úkol z aktivního seznamu do cílového; v cíli dostane nové ID.
