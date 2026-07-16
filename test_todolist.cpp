@@ -422,24 +422,24 @@ void test_neplatne_aktivni_id() {
     assert(stav.aktivniId == 3);  // neexistující ID -> první seznam
 }
 
-void test_uloz_seznamy_uspech_a_selhani() {
-    std::array<unsigned char, crypto_pwhash_SALTBYTES> sul;
-    randombytes_buf(sul.data(), sul.size());
-    std::vector<unsigned char> klic = odvodKlic("tajneheslo", sul.data());
-    StavSeznamu stav;
-    stav.seznamy = {{1, "Ukoly", {{1, "nakoupit", false}}}};
-    stav.aktivniId = 1;
+void test_uloz_seznam_do_souboru() {
+    Seznam seznam;
+    seznam.id = 1;
+    seznam.nazev = "Test";
+    seznam.ukoly = {{1, "nakoupit", false, "18/07/26"}};
+    randombytes_buf(seznam.sul.data(), seznam.sul.size());
+    seznam.klic = odvodKlic("tajneheslo", seznam.sul.data());
 
-    const std::string soubor = "test_uloz_docasny.txt";
-    assert(ulozSeznamy(stav, soubor, klic, sul));
-    std::optional<std::string> obsah = nactiObsahSouboru(soubor);
+    const std::string cesta = "test_trezor_docasny.txt";
+    assert(ulozSeznamDoSouboru(seznam, cesta));
+    std::optional<std::string> obsah = nactiObsahSouboru(cesta);
     assert(obsah && jeSifrovany(*obsah));
     std::optional<VysledekDesifrovani> vysledek = desifruj(*obsah, "tajneheslo");
-    assert(vysledek && vysledek->plaintext == serializujSeznamy(stav));
-    std::remove(soubor.c_str());
+    assert(vysledek && vysledek->plaintext == serializujUkoly(seznam.ukoly));
+    std::remove(cesta.c_str());
 
     // selhani: neexistujici adresar (hlaska na stderr je ocekavana)
-    assert(!ulozSeznamy(stav, "neexistujici_adresar/ukoly.txt", klic, sul));
+    assert(!ulozSeznamDoSouboru(seznam, "neexistujici_adresar/x.txt"));
 }
 
 void test_kontrola_nazvu_seznamu() {
@@ -789,7 +789,7 @@ int main() {
     test_razeni_roundtrip();
     test_serazene_ukoly();
     test_sestav_prehled();
-    test_uloz_seznamy_uspech_a_selhani();
+    test_uloz_seznam_do_souboru();
     test_pridat_seznam();
     test_vybrat_seznam();
     test_prejmenovat_seznam();

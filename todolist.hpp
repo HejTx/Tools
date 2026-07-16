@@ -339,13 +339,11 @@ inline int presunUkol(StavSeznamu& stav, int zdrojId, int ukolId, int cilId) {
     return 0;
 }
 
-// Uloží všechny seznamy zašifrovaně (stejný klíč a sůl, nová nonce při každém zápisu).
-// Zapisuje přes dočasný soubor a rename, aby selhání zápisu nezničilo původní data.
-// Vrací false, když se zápis nezdařil (původní soubor zůstává nedotčen).
-inline bool ulozSeznamy(const StavSeznamu& stav, const std::string& soubor,
-                        const std::vector<unsigned char>& klic,
-                        const std::array<unsigned char, crypto_pwhash_SALTBYTES>& sul) {
-    const std::string docasny = soubor + ".tmp";
+// Uloží jeden seznam do jeho souboru (vlastní klíč a sůl, nová nonce).
+// Zapisuje přes dočasný soubor a rename, aby selhání zápisu nezničilo původní
+// data. Vrací false, když se zápis nezdařil.
+inline bool ulozSeznamDoSouboru(const Seznam& seznam, const std::string& cesta) {
+    const std::string docasny = cesta + ".tmp";
 
     std::ofstream out(docasny, std::ios::binary);
     if (!out) {
@@ -353,7 +351,7 @@ inline bool ulozSeznamy(const StavSeznamu& stav, const std::string& soubor,
         return false;
     }
 
-    out << zasifruj(serializujSeznamy(stav), klic, sul);
+    out << zasifruj(serializujUkoly(seznam.ukoly), seznam.klic, seznam.sul);
     out.flush();
     if (!out) {
         std::cerr << "Zapis do souboru " << docasny << " se nezdaril, puvodni data zustavaji.\n";
@@ -363,8 +361,8 @@ inline bool ulozSeznamy(const StavSeznamu& stav, const std::string& soubor,
     }
     out.close();
 
-    if (std::rename(docasny.c_str(), soubor.c_str()) != 0) {
-        std::cerr << "Nepodarilo se prejmenovat " << docasny << " na " << soubor << ".\n";
+    if (std::rename(docasny.c_str(), cesta.c_str()) != 0) {
+        std::cerr << "Nepodarilo se prejmenovat " << docasny << " na " << cesta << ".\n";
         std::remove(docasny.c_str());
         return false;
     }
