@@ -89,6 +89,29 @@ void test_smazat_prikaz() {
     assert(rozeberPrikaz("d 0").typ == TypPrikazu::Neznamy);
 }
 
+void test_upravit_prikaz() {
+    Prikaz p = rozeberPrikaz("e 2 novy text ukolu");
+    assert(p.typ == TypPrikazu::UpravitUkol);
+    assert(p.id == 2 && p.popis == "novy text ukolu");
+    assert(rozeberPrikaz("e").typ == TypPrikazu::Neznamy);
+    assert(rozeberPrikaz("e abc x").typ == TypPrikazu::Neznamy);
+}
+
+void test_presunout_prikaz() {
+    Prikaz p = rozeberPrikaz("m 3 2");
+    assert(p.typ == TypPrikazu::PresunoutUkol);
+    assert(p.id == 3 && p.id2 == 2);
+    assert(rozeberPrikaz("m").typ == TypPrikazu::Neznamy);
+    assert(rozeberPrikaz("m 3").typ == TypPrikazu::Neznamy);
+    assert(rozeberPrikaz("m 3 abc").typ == TypPrikazu::Neznamy);
+}
+
+void test_bezargumentove_prikazy() {
+    assert(rozeberPrikaz("c").typ == TypPrikazu::VycistitHotove);
+    assert(rozeberPrikaz("u").typ == TypPrikazu::Zpet);
+    assert(rozeberPrikaz("zh").typ == TypPrikazu::ZmenaHesla);
+}
+
 void test_napoveda_prikaz() {
     assert(rozeberPrikaz("h").typ == TypPrikazu::Napoveda);
     assert(rozeberPrikaz("h cokoli").typ == TypPrikazu::Napoveda);  // zbytek se ignoruje
@@ -421,6 +444,9 @@ int main() {
     test_vybrat_seznam_prikaz();
     test_prejmenovat_prikaz();
     test_smazat_prikaz();
+    test_upravit_prikaz();
+    test_presunout_prikaz();
+    test_bezargumentove_prikazy();
     test_napoveda_prikaz();
     test_neznamy_prikaz();
     test_vytiskni_napovedu();

@@ -292,12 +292,14 @@ inline bool oznacitUkolDokonceny(std::vector<Task>& ukoly, int id) {
 
 enum class TypPrikazu { Pridat, Oznacit, Odebrat, Konec, Neznamy, Ulozit,
                         NovySeznam, VybratSeznam, PrejmenovatSeznam, SmazatSeznam,
-                        Napoveda };
+                        Napoveda, UpravitUkol, PresunoutUkol, VycistitHotove,
+                        Zpet, ZmenaHesla };
 
 struct Prikaz {
     TypPrikazu typ = TypPrikazu::Neznamy;
     std::string popis;
     int id = -1;
+    int id2 = -1;
 };
 
 // Zbytek řádku bez úvodních mezer (popis úkolu / název seznamu).
@@ -308,15 +310,15 @@ inline std::string zbytekRadku(std::istringstream& ss) {
     return (start == std::string::npos) ? "" : zbytek.substr(start);
 }
 
-// Načte číselný argument do prikaz.id; při chybě nastaví Neznamy a vrátí false.
-inline bool nactiIdArgument(std::istringstream& ss, Prikaz& prikaz) {
+// Načte číselný argument do cíle; při chybě nastaví Neznamy a vrátí false.
+inline bool nactiIdArgument(std::istringstream& ss, Prikaz& prikaz, int& cil) {
     std::string idStr;
     if (!(ss >> idStr)) {
         prikaz.typ = TypPrikazu::Neznamy;
         return false;
     }
     try {
-        prikaz.id = std::stoi(idStr);
+        cil = std::stoi(idStr);
         return true;
     } catch (...) {
         prikaz.typ = TypPrikazu::Neznamy;
@@ -341,16 +343,32 @@ inline Prikaz rozeberPrikaz(const std::string& radek) {
         prikaz.popis = zbytekRadku(ss);
     } else if (token == "o" || token == "r") {
         prikaz.typ = (token == "o") ? TypPrikazu::Oznacit : TypPrikazu::Odebrat;
-        nactiIdArgument(ss, prikaz);
+        nactiIdArgument(ss, prikaz, prikaz.id);
+    } else if (token == "e") {
+        prikaz.typ = TypPrikazu::UpravitUkol;
+        if (nactiIdArgument(ss, prikaz, prikaz.id)) {
+            prikaz.popis = zbytekRadku(ss);
+        }
+    } else if (token == "m") {
+        prikaz.typ = TypPrikazu::PresunoutUkol;
+        if (nactiIdArgument(ss, prikaz, prikaz.id)) {
+            nactiIdArgument(ss, prikaz, prikaz.id2);
+        }
+    } else if (token == "c") {
+        prikaz.typ = TypPrikazu::VycistitHotove;
+    } else if (token == "u") {
+        prikaz.typ = TypPrikazu::Zpet;
+    } else if (token == "zh") {
+        prikaz.typ = TypPrikazu::ZmenaHesla;
     } else if (token == "n") {
         prikaz.typ = TypPrikazu::NovySeznam;
         prikaz.popis = zbytekRadku(ss);
     } else if (token == "v") {
         prikaz.typ = TypPrikazu::VybratSeznam;
-        nactiIdArgument(ss, prikaz);
+        nactiIdArgument(ss, prikaz, prikaz.id);
     } else if (token == "j") {
         prikaz.typ = TypPrikazu::PrejmenovatSeznam;
-        if (nactiIdArgument(ss, prikaz)) {
+        if (nactiIdArgument(ss, prikaz, prikaz.id)) {
             prikaz.popis = zbytekRadku(ss);
         }
     } else if (token == "d") {
