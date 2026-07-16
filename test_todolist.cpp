@@ -95,6 +95,14 @@ void test_vykresli_se_zpravou() {
         "> ");
 }
 
+void test_procenta() {
+    assert(formatujProcenta({}) == "0.0%");
+    assert(formatujProcenta({{1, "a", true}, {2, "b", false}}) == "50.0%");
+    assert(formatujProcenta({{1, "a", true}, {2, "b", false}, {3, "c", false}}) == "33.3%");
+    assert(formatujProcenta({{1, "a", true}, {2, "b", true}, {3, "c", false}}) == "66.7%");
+    assert(formatujProcenta({{1, "a", true}}) == "100.0%");
+}
+
 void test_serializace_format() {
     std::vector<Task> ukoly = {{1, "nakoupit", true}, {2, "uklidit", false}};
     assert(serializujUkoly(ukoly) == "1;nakoupit;1\n2;uklidit;0\n");
@@ -190,6 +198,7 @@ int main() {
     test_vykresli_prazdny_seznam();
     test_vykresli_ukoly_hotovy_sede();
     test_vykresli_se_zpravou();
+    test_procenta();
     test_serializace_format();
     test_parsovani_roundtrip();
     test_parsovani_preskoci_prazdne_radky();

@@ -16,6 +16,18 @@ struct Task {
     bool done = false;
 };
 
+// Podíl hotových úkolů jako "50.0%"; prázdný seznam = "0.0%".
+inline std::string formatujProcenta(const std::vector<Task>& ukoly) {
+    int hotovo = 0;
+    for (const auto& ukol : ukoly) {
+        if (ukol.done) ++hotovo;
+    }
+    double procenta = ukoly.empty() ? 0.0 : 100.0 * hotovo / ukoly.size();
+    char buf[16];
+    std::snprintf(buf, sizeof(buf), "%.1f%%", procenta);
+    return buf;
+}
+
 inline std::string serializujUkoly(const std::vector<Task>& ukoly) {
     std::ostringstream out;
     for (const auto& ukol : ukoly) {
