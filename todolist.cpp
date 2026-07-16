@@ -182,12 +182,24 @@ int main() {
                 }
                 break;
             }
+            case TypPrikazu::Napoveda: {
+                std::cout << "\033[2J\033[H";
+                vytiskniNapovedu(std::cout);
+                std::string zahodit;
+                if (!std::getline(std::cin, zahodit)) {
+                    // EOF v nápovědě = konec jako v hlavní smyčce
+                    prikaz.typ = TypPrikazu::Konec;
+                }
+                zprava.clear();
+                break;
+            }
             case TypPrikazu::Konec:
                 break;
             default:
                 zprava = "Neznamy prikaz.";
                 break;
         }
+        if (prikaz.typ == TypPrikazu::Konec) break;
     }
 
     ulozSeznamy(stav, soubor, klic, sul);
