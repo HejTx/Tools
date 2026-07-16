@@ -159,7 +159,7 @@ void test_vytiskni_seznamy() {
     std::ostringstream out;
     vytiskniSeznamy(out, stav);
     assert(out.str() ==
-        "Seznamy: [1] Nakup (50.0%) | \033[1m>[2] Ukoly EQ tyden (0.0%)<\033[0m\n");
+        "Seznamy: [0] Vse (50.0%) | [1] Nakup (50.0%) | \033[1m>[2] Ukoly EQ tyden (0.0%)<\033[0m\n");
 }
 
 void test_vytiskni_napovedu() {
@@ -173,22 +173,26 @@ void test_vytiskni_napovedu() {
         "  o <id>           Oznaci ukol jako hotovy.\n"
         "  r <id>           Odebere ukol ze seznamu.\n"
         "  e <id> <popis>   Upravi popis ukolu.\n"
+        "  t <id> <datum>   Nastavi termin (dd/mm/yy); t <id> bez data termin smaze.\n"
         "  m <id> <sid>     Presune ukol do seznamu <sid>.\n"
-        "  c                Odstrani hotove ukoly z aktivniho seznamu.\n"
+        "  c                Odstrani hotove ukoly (v prehledu 0 ze vsech seznamu).\n"
         "\n"
         "PRIKAZY SEZNAMU\n"
         "  n <nazev>        Zalozi novy seznam a prepne na nej.\n"
-        "  v <id>           Prepne na seznam podle ID.\n"
+        "  v <id>           Prepne na seznam podle ID; v 0 = prehled vsech ukolu.\n"
         "  j <id> <nazev>   Prejmenuje seznam.\n"
         "  d                Smaze aktivni seznam (bez potvrzeni!).\n"
         "  d <id>           Smaze seznam podle ID.\n"
         "\n"
         "OSTATNI\n"
         "  u                Vrati posledni zmenu (u znovu = zpet).\n"
+        "  z                Prepina razeni: podle ID / podle terminu.\n"
         "  s                Ulozi vsechny seznamy.\n"
         "  q                Ulozi a ukonci program.\n"
         "  zh               Zmeni heslo souboru.\n"
         "  h                Zobrazi tuto napovedu.\n"
+        "\n"
+        "Ukoly lze adresovat i jako <seznam>.<ukol> (napr. o 2.3) - v prehledu 0 je to nutne.\n"
         "\n"
         "Pokracuj stiskem Enteru...\n");
 }
@@ -199,10 +203,10 @@ void test_vytiskni_seznamy_zalamovani() {
     stav.aktivniId = 1;
     std::ostringstream out;
     vytiskniSeznamy(out, stav, 45);
-    // 9 + 17 (aktivni) + 3 + 15 = 44 <= 45; Gama by presahla -> zalom
+    // 9 + 14 (Vse) + 3 + 17 (aktivni) = 43 <= 45; Beta by presahla -> zalom
     assert(out.str() ==
-        "Seznamy: \033[1m>[1] Alfa (0.0%)<\033[0m | [2] Beta (0.0%)\n"
-        "         [3] Gama (0.0%)\n");
+        "Seznamy: [0] Vse (0.0%) | \033[1m>[1] Alfa (0.0%)<\033[0m\n"
+        "         [2] Beta (0.0%) | [3] Gama (0.0%)\n");
 }
 
 void test_vytiskni_seznamy_uzka_obrazovka() {
@@ -213,8 +217,26 @@ void test_vytiskni_seznamy_uzka_obrazovka() {
     vytiskniSeznamy(out, stav, 10);
     // kazda polozka sirsi nez sirka -> jedna na radek
     assert(out.str() ==
-        "Seznamy: \033[1m>[1] Alfa (0.0%)<\033[0m\n"
+        "Seznamy: [0] Vse (0.0%)\n"
+        "         \033[1m>[1] Alfa (0.0%)<\033[0m\n"
         "         [2] Beta (0.0%)\n");
+}
+
+void test_vykresli_prehled() {
+    StavSeznamu stav;
+    stav.seznamy = {
+        {1, "A", {{1, "a1", false, "20/08/26"}}},
+        {2, "B", {{1, "b1", true}}},
+    };
+    stav.aktivniId = 0;
+    stav.razeni = 1;
+    std::ostringstream out;
+    vykresliObrazovku(out, stav, "");
+    std::string obrazovka = out.str();
+    assert(obrazovka.find("=== Vse === (razeni: ID)\n") != std::string::npos);
+    assert(obrazovka.find("ID: 1.1, Popis: a1, Dokonceno: Ne, Termin: 20/08/26\n") != std::string::npos);
+    assert(obrazovka.find("\033[90mID: 2.1, Popis: b1, Dokonceno: Ano\033[0m\n") != std::string::npos);
+    assert(obrazovka.find("Seznamy: \033[1m>[0] Vse (50.0%)<\033[0m") != std::string::npos);
 }
 
 void test_vykresli_prazdny_seznam() {
@@ -224,13 +246,13 @@ void test_vykresli_prazdny_seznam() {
     std::ostringstream out;
     vykresliObrazovku(out, stav, "");
     assert(out.str() ==
-        "Seznamy: \033[1m>[1] Ukoly (0.0%)<\033[0m\n"
-        "=== Ukoly ===\n"
+        "Seznamy: [0] Vse (0.0%) | \033[1m>[1] Ukoly (0.0%)<\033[0m\n"
+        "=== Ukoly === (razeni: ID)\n"
         "Zadne ukoly.\n"
         "\n"
-        "\033[90mukol: p pridat · o hotovo · r odebrat · e upravit · m presunout · c uklidit\n"
-        "seznam: n novy · v vybrat · j prejmenovat · d smazat\n"
-        "jine: u zpet · s ulozit · zh heslo · q konec · h napoveda\033[0m\n"
+        "\033[90mukol: p pridat · o hotovo · r odebrat · e upravit · m presunout · t termin\n"
+        "seznam: n novy · v vybrat · j prejmenovat · d smazat · c uklidit\n"
+        "jine: u zpet · z razeni · s ulozit · zh heslo · q konec · h napoveda\033[0m\n"
         "> ");
 }
 
@@ -241,14 +263,14 @@ void test_vykresli_ukoly_hotovy_sede() {
     std::ostringstream out;
     vykresliObrazovku(out, stav, "");
     assert(out.str() ==
-        "Seznamy: \033[1m>[1] Ukoly (50.0%)<\033[0m\n"
-        "=== Ukoly ===\n"
+        "Seznamy: [0] Vse (50.0%) | \033[1m>[1] Ukoly (50.0%)<\033[0m\n"
+        "=== Ukoly === (razeni: ID)\n"
         "\033[90mID: 1, Popis: nakoupit, Dokonceno: Ano\033[0m\n"
         "ID: 2, Popis: uklidit, Dokonceno: Ne\n"
         "\n"
-        "\033[90mukol: p pridat · o hotovo · r odebrat · e upravit · m presunout · c uklidit\n"
-        "seznam: n novy · v vybrat · j prejmenovat · d smazat\n"
-        "jine: u zpet · s ulozit · zh heslo · q konec · h napoveda\033[0m\n"
+        "\033[90mukol: p pridat · o hotovo · r odebrat · e upravit · m presunout · t termin\n"
+        "seznam: n novy · v vybrat · j prejmenovat · d smazat · c uklidit\n"
+        "jine: u zpet · z razeni · s ulozit · zh heslo · q konec · h napoveda\033[0m\n"
         "> ");
 }
 
@@ -259,15 +281,15 @@ void test_vykresli_se_zpravou() {
     std::ostringstream out;
     vykresliObrazovku(out, stav, "Ukol pridan.");
     assert(out.str() ==
-        "Seznamy: \033[1m>[1] Ukoly (0.0%)<\033[0m\n"
-        "=== Ukoly ===\n"
+        "Seznamy: [0] Vse (0.0%) | \033[1m>[1] Ukoly (0.0%)<\033[0m\n"
+        "=== Ukoly === (razeni: ID)\n"
         "Zadne ukoly.\n"
         "\n"
         "Ukol pridan.\n"
         "\n"
-        "\033[90mukol: p pridat · o hotovo · r odebrat · e upravit · m presunout · c uklidit\n"
-        "seznam: n novy · v vybrat · j prejmenovat · d smazat\n"
-        "jine: u zpet · s ulozit · zh heslo · q konec · h napoveda\033[0m\n"
+        "\033[90mukol: p pridat · o hotovo · r odebrat · e upravit · m presunout · t termin\n"
+        "seznam: n novy · v vybrat · j prejmenovat · d smazat · c uklidit\n"
+        "jine: u zpet · z razeni · s ulozit · zh heslo · q konec · h napoveda\033[0m\n"
         "> ");
 }
 
@@ -664,6 +686,7 @@ int main() {
     test_vytiskni_seznamy();
     test_vytiskni_seznamy_zalamovani();
     test_vytiskni_seznamy_uzka_obrazovka();
+    test_vykresli_prehled();
     test_vykresli_prazdny_seznam();
     test_vykresli_ukoly_hotovy_sede();
     test_vykresli_se_zpravou();

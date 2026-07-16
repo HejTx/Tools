@@ -561,22 +561,26 @@ inline void vytiskniNapovedu(std::ostream& out) {
            "  o <id>           Oznaci ukol jako hotovy.\n"
            "  r <id>           Odebere ukol ze seznamu.\n"
            "  e <id> <popis>   Upravi popis ukolu.\n"
+           "  t <id> <datum>   Nastavi termin (dd/mm/yy); t <id> bez data termin smaze.\n"
            "  m <id> <sid>     Presune ukol do seznamu <sid>.\n"
-           "  c                Odstrani hotove ukoly z aktivniho seznamu.\n"
+           "  c                Odstrani hotove ukoly (v prehledu 0 ze vsech seznamu).\n"
            "\n"
            "PRIKAZY SEZNAMU\n"
            "  n <nazev>        Zalozi novy seznam a prepne na nej.\n"
-           "  v <id>           Prepne na seznam podle ID.\n"
+           "  v <id>           Prepne na seznam podle ID; v 0 = prehled vsech ukolu.\n"
            "  j <id> <nazev>   Prejmenuje seznam.\n"
            "  d                Smaze aktivni seznam (bez potvrzeni!).\n"
            "  d <id>           Smaze seznam podle ID.\n"
            "\n"
            "OSTATNI\n"
            "  u                Vrati posledni zmenu (u znovu = zpet).\n"
+           "  z                Prepina razeni: podle ID / podle terminu.\n"
            "  s                Ulozi vsechny seznamy.\n"
            "  q                Ulozi a ukonci program.\n"
            "  zh               Zmeni heslo souboru.\n"
            "  h                Zobrazi tuto napovedu.\n"
+           "\n"
+           "Ukoly lze adresovat i jako <seznam>.<ukol> (napr. o 2.3) - v prehledu 0 je to nutne.\n"
            "\n"
            "Pokracuj stiskem Enteru...\n";
 }
@@ -584,13 +588,26 @@ inline void vytiskniNapovedu(std::ostream& out) {
 // Vypíše řádek seznamů; při přesahu šířky zalamuje s odsazením pod
 // "Seznamy: ". Viditelná délka se počítá bez ANSI kódů (v bajtech, ASCII).
 inline void vytiskniSeznamy(std::ostream& out, const StavSeznamu& stav, int sirka = 80) {
+    int hotovoCelkem = 0;
+    int celkem = 0;
+    for (const auto& seznam : stav.seznamy) {
+        celkem += static_cast<int>(seznam.ukoly.size());
+        for (const auto& ukol : seznam.ukoly) {
+            if (ukol.done) ++hotovoCelkem;
+        }
+    }
+    std::vector<std::pair<int, std::string>> polozky;
+    polozky.push_back({0, "[0] Vse (" + formatujProcenta(hotovoCelkem, celkem) + ")"});
+    for (const auto& seznam : stav.seznamy) {
+        polozky.push_back({seznam.id, "[" + std::to_string(seznam.id) + "] " + seznam.nazev
+                                      + " (" + formatujProcenta(seznam.ukoly) + ")"});
+    }
+
     out << "Seznamy: ";
     int delkaRadku = 9;
     bool prvniNaRadku = true;
-    for (const auto& seznam : stav.seznamy) {
-        std::string polozka = "[" + std::to_string(seznam.id) + "] " + seznam.nazev
-                              + " (" + formatujProcenta(seznam.ukoly) + ")";
-        bool aktivni = (seznam.id == stav.aktivniId);
+    for (const auto& [id, polozka] : polozky) {
+        bool aktivni = (id == stav.aktivniId);
         int viditelna = static_cast<int>(polozka.size()) + (aktivni ? 2 : 0);
         if (!prvniNaRadku && delkaRadku + 3 + viditelna > sirka) {
             out << "\n         ";
@@ -617,19 +634,33 @@ inline void vykresliObrazovku(std::ostream& out,
                               const std::string& zprava,
                               int sirka = 80) {
     vytiskniSeznamy(out, stav, sirka);
-    const Seznam* aktivni = najdiSeznam(stav.seznamy, stav.aktivniId);
-    out << "=== " << aktivni->nazev << " ===\n";
-    if (aktivni->ukoly.empty()) {
-        out << "Zadne ukoly.\n";
+    const char* rezim = (stav.razeni == 2) ? "termin" : "ID";
+    if (stav.aktivniId == 0) {
+        out << "=== Vse === (razeni: " << rezim << ")\n";
+        std::vector<PolozkaPrehledu> polozky = sestavPrehled(stav);
+        if (polozky.empty()) {
+            out << "Zadne ukoly.\n";
+        } else {
+            for (const auto& polozka : polozky) {
+                vytiskniUkol(out, polozka.ukol, std::to_string(polozka.seznamId) + ".");
+            }
+        }
     } else {
-        vytiskniUkoly(out, aktivni->ukoly);
+        const Seznam* aktivni = najdiSeznam(stav.seznamy, stav.aktivniId);
+        out << "=== " << aktivni->nazev << " === (razeni: " << rezim << ")\n";
+        std::vector<Task> ukoly = serazeneUkoly(aktivni->ukoly, stav.razeni);
+        if (ukoly.empty()) {
+            out << "Zadne ukoly.\n";
+        } else {
+            vytiskniUkoly(out, ukoly);
+        }
     }
     out << "\n";
     if (!zprava.empty()) {
         out << zprava << "\n\n";
     }
-    out << "\033[90mukol: p pridat · o hotovo · r odebrat · e upravit · m presunout · c uklidit\n"
-           "seznam: n novy · v vybrat · j prejmenovat · d smazat\n"
-           "jine: u zpet · s ulozit · zh heslo · q konec · h napoveda\033[0m\n"
+    out << "\033[90mukol: p pridat · o hotovo · r odebrat · e upravit · m presunout · t termin\n"
+           "seznam: n novy · v vybrat · j prejmenovat · d smazat · c uklidit\n"
+           "jine: u zpet · z razeni · s ulozit · zh heslo · q konec · h napoveda\033[0m\n"
         << "> ";
 }
