@@ -136,7 +136,10 @@ inline std::vector<Task> parsujUkoly(const std::string& obsah) {
 struct Seznam {
     int id;
     std::string nazev;
-    std::vector<Task> ukoly;
+    std::vector<Task> ukoly;                                    // jen odemčené
+    bool odemceno = true;   // pahýly (jen název) vytváří pouze startovní sken
+    std::vector<unsigned char> klic;                            // jen odemčené
+    std::array<unsigned char, crypto_pwhash_SALTBYTES> sul{};   // jen odemčené
 };
 
 struct StavSeznamu {
@@ -164,7 +167,8 @@ inline std::string serializujSeznamy(const StavSeznamu& stav) {
     out << "@aktivni;" << stav.aktivniId << "\n";
     out << "@razeni;" << stav.razeni << "\n";
     for (const auto& seznam : stav.seznamy) {
-        out << "#seznam;" << seznam.id << ";" << seznam.nazev << "\n"
+        out << "#seznam;" << seznam.id << ";" << seznam.nazev
+            << (seznam.odemceno ? "" : ";zamceno") << "\n"
             << serializujUkoly(seznam.ukoly);
     }
     return out.str();
@@ -264,11 +268,14 @@ inline bool smazatSeznam(StavSeznamu& stav, int id) {
     if (it == stav.seznamy.end()) return false;
     stav.seznamy.erase(it);
 
-    if (stav.seznamy.empty()) {
-        stav.seznamy.push_back({1, "Ukoly", {}});
-        if (stav.aktivniId != 0) stav.aktivniId = 1;
-    } else if (stav.aktivniId != 0 && najdiSeznam(stav.seznamy, stav.aktivniId) == nullptr) {
-        stav.aktivniId = stav.seznamy.front().id;
+    if (stav.aktivniId != 0 && najdiSeznam(stav.seznamy, stav.aktivniId) == nullptr) {
+        stav.aktivniId = 0;  // žádný odemčený -> přehled
+        for (const auto& seznam : stav.seznamy) {
+            if (seznam.odemceno) {
+                stav.aktivniId = seznam.id;
+                break;
+            }
+        }
     }
     return true;
 }
@@ -296,6 +303,7 @@ struct PolozkaPrehledu {
 inline std::vector<PolozkaPrehledu> sestavPrehled(const StavSeznamu& stav) {
     std::vector<PolozkaPrehledu> polozky;
     for (const auto& seznam : stav.seznamy) {
+        if (!seznam.odemceno) continue;
         for (const auto& ukol : seznam.ukoly) {
             polozky.push_back({seznam.id, ukol});
         }
@@ -629,6 +637,7 @@ inline void vytiskniSeznamy(std::ostream& out, const StavSeznamu& stav, int sirk
     int hotovoCelkem = 0;
     int celkem = 0;
     for (const auto& seznam : stav.seznamy) {
+        if (!seznam.odemceno) continue;
         celkem += static_cast<int>(seznam.ukoly.size());
         for (const auto& ukol : seznam.ukoly) {
             if (ukol.done) ++hotovoCelkem;
@@ -637,8 +646,11 @@ inline void vytiskniSeznamy(std::ostream& out, const StavSeznamu& stav, int sirk
     std::vector<std::pair<int, std::string>> polozky;
     polozky.push_back({0, "[0] Vse (" + formatujProcenta(hotovoCelkem, celkem) + ")"});
     for (const auto& seznam : stav.seznamy) {
-        polozky.push_back({seznam.id, "[" + std::to_string(seznam.id) + "] " + seznam.nazev
-                                      + " (" + formatujProcenta(seznam.ukoly) + ")"});
+        polozky.push_back({seznam.id,
+            seznam.odemceno
+                ? "[" + std::to_string(seznam.id) + "] " + seznam.nazev
+                      + " (" + formatujProcenta(seznam.ukoly) + ")"
+                : "[" + std::to_string(seznam.id) + "] " + seznam.nazev + " (zamceno)"});
     }
 
     out << "Seznamy: ";

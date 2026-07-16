@@ -505,6 +505,59 @@ void test_sestav_prehled() {
     assert(podleTerminu[2].ukol.termin == "");          // bez terminu nakonec
 }
 
+void test_serializace_zamceneho() {
+    StavSeznamu stav;
+    stav.aktivniId = 1;
+    stav.seznamy = {{1, "A", {}}};
+    Seznam pahyl;
+    pahyl.id = 2;
+    pahyl.nazev = "Tajny";
+    pahyl.odemceno = false;
+    stav.seznamy.push_back(pahyl);
+    assert(serializujSeznamy(stav) ==
+        "@aktivni;1\n@razeni;1\n#seznam;1;A\n#seznam;2;Tajny;zamceno\n");
+}
+
+void test_smazat_posledni_odemceny() {
+    StavSeznamu stav;
+    stav.seznamy = {{1, "A", {}}};
+    Seznam pahyl;
+    pahyl.id = 2;
+    pahyl.nazev = "Tajny";
+    pahyl.odemceno = false;
+    stav.seznamy.push_back(pahyl);
+    stav.aktivniId = 1;
+    assert(smazatSeznam(stav, 1));
+    assert(stav.aktivniId == 0);          // zadny odemceny -> prehled
+    assert(stav.seznamy.size() == 1);     // zadna auto-nahrada "Ukoly"
+}
+
+void test_prehled_preskoci_zamcene() {
+    StavSeznamu stav;
+    stav.seznamy = {{1, "A", {{1, "a1", false}}}};
+    Seznam pahyl;
+    pahyl.id = 2;
+    pahyl.nazev = "Tajny";
+    pahyl.odemceno = false;
+    stav.seznamy.push_back(pahyl);
+    assert(sestavPrehled(stav).size() == 1);
+}
+
+void test_vytiskni_seznamy_zamceny() {
+    StavSeznamu stav;
+    stav.seznamy = {{1, "A", {{1, "a1", true}}}};
+    Seznam pahyl;
+    pahyl.id = 2;
+    pahyl.nazev = "Tajny";
+    pahyl.odemceno = false;
+    stav.seznamy.push_back(pahyl);
+    stav.aktivniId = 1;
+    std::ostringstream out;
+    vytiskniSeznamy(out, stav);
+    assert(out.str() ==
+        "Seznamy: [0] Vse (100.0%) | \033[1m>[1] A (100.0%)<\033[0m | [2] Tajny (zamceno)\n");
+}
+
 void test_pridat_seznam() {
     StavSeznamu stav;
     stav.seznamy = {{1, "Ukoly", {}}};
@@ -553,10 +606,8 @@ void test_smazat_posledni_seznam() {
     stav.seznamy = {{5, "Jediny", {{1, "ukol", false}}}};
     stav.aktivniId = 5;
     assert(smazatSeznam(stav, 5));
-    assert(stav.seznamy.size() == 1);
-    assert(stav.seznamy[0].id == 1 && stav.seznamy[0].nazev == "Ukoly");
-    assert(stav.seznamy[0].ukoly.empty());
-    assert(stav.aktivniId == 1);
+    assert(stav.seznamy.empty());   // zadna auto-nahrada
+    assert(stav.aktivniId == 0);    // aktivni je prehled
 }
 
 void test_upravit_ukol() {
@@ -617,11 +668,11 @@ void test_seznam_nula_stav() {
     stav.aktivniId = 1;
     assert(vybratSeznam(stav, 0) && stav.aktivniId == 0);
     assert(smazatSeznam(stav, 1) && stav.aktivniId == 0);   // prehled zustava
-    assert(smazatSeznam(stav, 2) && stav.aktivniId == 0);   // i po poslednim
-    assert(stav.seznamy.size() == 1 && stav.seznamy[0].nazev == "Ukoly");
     // @aktivni;0 prezije round-trip
     StavSeznamu zpet = parsujSeznamy(serializujSeznamy(stav));
     assert(zpet.aktivniId == 0);
+    assert(smazatSeznam(stav, 2) && stav.aktivniId == 0);   // i po poslednim
+    assert(stav.seznamy.empty());                           // zadna auto-nahrada
 }
 
 void test_sifrovani_roundtrip() {
@@ -731,6 +782,10 @@ int main() {
     test_neplatne_aktivni_id();
     test_kontrola_nazvu_seznamu();
     test_nastaveni_roundtrip();
+    test_serializace_zamceneho();
+    test_smazat_posledni_odemceny();
+    test_prehled_preskoci_zamcene();
+    test_vytiskni_seznamy_zamceny();
     test_razeni_roundtrip();
     test_serazene_ukoly();
     test_sestav_prehled();
