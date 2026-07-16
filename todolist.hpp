@@ -155,6 +155,44 @@ inline StavSeznamu parsujSeznamy(const std::string& obsah) {
     return stav;
 }
 
+// Založí seznam a rovnou na něj přepne. Vrací nové ID.
+inline int pridatSeznam(StavSeznamu& stav, const std::string& nazev) {
+    int noveId = stav.seznamy.empty() ? 1 : stav.seznamy.back().id + 1;
+    stav.seznamy.push_back({noveId, nazev, {}});
+    stav.aktivniId = noveId;
+    return noveId;
+}
+
+inline bool vybratSeznam(StavSeznamu& stav, int id) {
+    if (najdiSeznam(stav.seznamy, id) == nullptr) return false;
+    stav.aktivniId = id;
+    return true;
+}
+
+inline bool prejmenovatSeznam(std::vector<Seznam>& seznamy, int id, const std::string& nazev) {
+    Seznam* seznam = najdiSeznam(seznamy, id);
+    if (!seznam) return false;
+    seznam->nazev = nazev;
+    return true;
+}
+
+// Smaže seznam podle ID. Po smazání aktivního se aktivním stane první
+// zbývající; po smazání posledního vznikne čerstvý prázdný seznam "Ukoly".
+inline bool smazatSeznam(StavSeznamu& stav, int id) {
+    auto it = std::find_if(stav.seznamy.begin(), stav.seznamy.end(),
+                           [id](const Seznam& seznam) { return seznam.id == id; });
+    if (it == stav.seznamy.end()) return false;
+    stav.seznamy.erase(it);
+
+    if (stav.seznamy.empty()) {
+        stav.seznamy.push_back({1, "Ukoly", {}});
+        stav.aktivniId = 1;
+    } else if (najdiSeznam(stav.seznamy, stav.aktivniId) == nullptr) {
+        stav.aktivniId = stav.seznamy.front().id;
+    }
+    return true;
+}
+
 // Uloží úkoly zašifrovaně (stejný klíč a sůl, nová nonce při každém zápisu).
 // Zapisuje přes dočasný soubor a rename, aby selhání zápisu nezničilo původní data.
 inline void ulozUkoly(const std::vector<Task>& ukoly, const std::string& soubor,

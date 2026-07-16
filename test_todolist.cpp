@@ -175,6 +175,60 @@ void test_neplatne_aktivni_id() {
     assert(stav.aktivniId == 3);  // neexistující ID -> první seznam
 }
 
+void test_pridat_seznam() {
+    StavSeznamu stav;
+    stav.seznamy = {{1, "Ukoly", {}}};
+    stav.aktivniId = 1;
+    int id = pridatSeznam(stav, "Prace");
+    assert(id == 2);
+    assert(stav.seznamy.size() == 2 && stav.seznamy[1].nazev == "Prace");
+    assert(stav.aktivniId == 2);  // nový seznam se rovnou otevře
+}
+
+void test_vybrat_seznam() {
+    StavSeznamu stav;
+    stav.seznamy = {{1, "A", {}}, {2, "B", {}}};
+    stav.aktivniId = 1;
+    assert(vybratSeznam(stav, 2) && stav.aktivniId == 2);
+    assert(!vybratSeznam(stav, 99) && stav.aktivniId == 2);
+}
+
+void test_prejmenovat_seznam() {
+    StavSeznamu stav;
+    stav.seznamy = {{1, "A", {}}};
+    assert(prejmenovatSeznam(stav.seznamy, 1, "Nakup"));
+    assert(stav.seznamy[0].nazev == "Nakup");
+    assert(!prejmenovatSeznam(stav.seznamy, 99, "X"));
+}
+
+void test_smazat_neaktivni_seznam() {
+    StavSeznamu stav;
+    stav.seznamy = {{1, "A", {}}, {2, "B", {}}};
+    stav.aktivniId = 1;
+    assert(smazatSeznam(stav, 2));
+    assert(stav.seznamy.size() == 1 && stav.aktivniId == 1);
+    assert(!smazatSeznam(stav, 99));
+}
+
+void test_smazat_aktivni_seznam() {
+    StavSeznamu stav;
+    stav.seznamy = {{1, "A", {}}, {2, "B", {}}, {3, "C", {}}};
+    stav.aktivniId = 2;
+    assert(smazatSeznam(stav, 2));
+    assert(stav.aktivniId == 1);  // první zbývající
+}
+
+void test_smazat_posledni_seznam() {
+    StavSeznamu stav;
+    stav.seznamy = {{5, "Jediny", {{1, "ukol", false}}}};
+    stav.aktivniId = 5;
+    assert(smazatSeznam(stav, 5));
+    assert(stav.seznamy.size() == 1);
+    assert(stav.seznamy[0].id == 1 && stav.seznamy[0].nazev == "Ukoly");
+    assert(stav.seznamy[0].ukoly.empty());
+    assert(stav.aktivniId == 1);
+}
+
 void test_sifrovani_roundtrip() {
     std::array<unsigned char, crypto_pwhash_SALTBYTES> sul;
     randombytes_buf(sul.data(), sul.size());
@@ -259,6 +313,12 @@ int main() {
     test_migrace_stareho_formatu();
     test_parsovani_prazdneho_obsahu();
     test_neplatne_aktivni_id();
+    test_pridat_seznam();
+    test_vybrat_seznam();
+    test_prejmenovat_seznam();
+    test_smazat_neaktivni_seznam();
+    test_smazat_aktivni_seznam();
+    test_smazat_posledni_seznam();
     test_sifrovani_roundtrip();
     test_sifrovani_prazdny_plaintext();
     test_spatne_heslo();
