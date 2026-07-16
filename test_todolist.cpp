@@ -369,6 +369,13 @@ void test_smazat_posledni_seznam() {
     assert(stav.aktivniId == 1);
 }
 
+void test_upravit_ukol() {
+    std::vector<Task> ukoly = {{1, "stary", true}};
+    assert(upravitUkol(ukoly, 1, "novy"));
+    assert(ukoly[0].description == "novy" && ukoly[0].done == true && ukoly[0].id == 1);
+    assert(!upravitUkol(ukoly, 99, "x"));
+}
+
 void test_sifrovani_roundtrip() {
     std::array<unsigned char, crypto_pwhash_SALTBYTES> sul;
     randombytes_buf(sul.data(), sul.size());
@@ -471,6 +478,7 @@ int main() {
     test_smazat_neaktivni_seznam();
     test_smazat_aktivni_seznam();
     test_smazat_posledni_seznam();
+    test_upravit_ukol();
     test_sifrovani_roundtrip();
     test_sifrovani_prazdny_plaintext();
     test_spatne_heslo();

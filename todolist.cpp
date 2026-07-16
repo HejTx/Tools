@@ -140,6 +140,18 @@ int main() {
                     zprava = "Ukol s ID " + std::to_string(prikaz.id) + " nenalezen.";
                 }
                 break;
+            case TypPrikazu::UpravitUkol:
+                if (prikaz.popis.empty()) {
+                    zprava = "Popis nesmi byt prazdny.";
+                } else if (prikaz.popis.find(';') != std::string::npos) {
+                    zprava = "Popis nesmi obsahovat znak ';'.";
+                } else if (upravitUkol(najdiSeznam(stav.seznamy, stav.aktivniId)->ukoly,
+                                       prikaz.id, prikaz.popis)) {
+                    zprava = "Ukol upraven.";
+                } else {
+                    zprava = "Ukol s ID " + std::to_string(prikaz.id) + " nenalezen.";
+                }
+                break;
             case TypPrikazu::Ulozit:
                 zprava = ulozSeznamy(stav, soubor, klic, sul)
                              ? "Ukoly ulozeny."

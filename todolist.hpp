@@ -290,6 +290,17 @@ inline bool oznacitUkolDokonceny(std::vector<Task>& ukoly, int id) {
     return false;
 }
 
+// Změní jen popis; ID a done zůstávají.
+inline bool upravitUkol(std::vector<Task>& ukoly, int id, const std::string& popis) {
+    for (auto& ukol : ukoly) {
+        if (ukol.id == id) {
+            ukol.description = popis;
+            return true;
+        }
+    }
+    return false;
+}
+
 enum class TypPrikazu { Pridat, Oznacit, Odebrat, Konec, Neznamy, Ulozit,
                         NovySeznam, VybratSeznam, PrejmenovatSeznam, SmazatSeznam,
                         Napoveda, UpravitUkol, PresunoutUkol, VycistitHotove,
