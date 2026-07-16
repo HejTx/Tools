@@ -50,6 +50,13 @@ std::optional<std::string> zvolNoveHeslo() {
     }
 }
 
+// Vrátí chybovou hlášku pro neplatný název seznamu, jinak prázdný string.
+std::string zkontrolujNazev(const std::string& nazev) {
+    if (nazev.empty()) return "Nazev nesmi byt prazdny.";
+    if (nazev.find(';') != std::string::npos) return "Nazev nesmi obsahovat znak ';'.";
+    return "";
+}
+
 // Zvolí nové heslo, vygeneruje čerstvou sůl a odvodí klíč. false = EOF.
 bool nastavNovyKlic(std::vector<unsigned char>& klic,
                     std::array<unsigned char, crypto_pwhash_SALTBYTES>& sul) {
@@ -108,25 +115,26 @@ int main() {
         Prikaz prikaz = rozeberPrikaz(radek);
         if (prikaz.typ == TypPrikazu::Konec) break;
 
-        Seznam* aktivni = najdiSeznam(stav.seznamy, stav.aktivniId);
+        // Pozor: ukazatel na aktivní seznam se resolvuje až v jednotlivých
+        // větvích — příkazy nad seznamy (push_back/erase) by ho zneplatnily.
         switch (prikaz.typ) {
             case TypPrikazu::Pridat:
                 if (prikaz.popis.find(';') != std::string::npos) {
                     zprava = "Popis nesmi obsahovat znak ';'.";
                 } else {
-                    pridatUkol(aktivni->ukoly, prikaz.popis);
+                    pridatUkol(najdiSeznam(stav.seznamy, stav.aktivniId)->ukoly, prikaz.popis);
                     zprava = "Ukol pridan.";
                 }
                 break;
             case TypPrikazu::Oznacit:
-                if (oznacitUkolDokonceny(aktivni->ukoly, prikaz.id)) {
+                if (oznacitUkolDokonceny(najdiSeznam(stav.seznamy, stav.aktivniId)->ukoly, prikaz.id)) {
                     zprava = "Ukol " + std::to_string(prikaz.id) + " oznacen jako hotovy.";
                 } else {
                     zprava = "Ukol s ID " + std::to_string(prikaz.id) + " nenalezen.";
                 }
                 break;
             case TypPrikazu::Odebrat:
-                if (odebratUkol(aktivni->ukoly, prikaz.id)) {
+                if (odebratUkol(najdiSeznam(stav.seznamy, stav.aktivniId)->ukoly, prikaz.id)) {
                     zprava = "Ukol " + std::to_string(prikaz.id) + " odebran.";
                 } else {
                     zprava = "Ukol s ID " + std::to_string(prikaz.id) + " nenalezen.";
@@ -137,11 +145,8 @@ int main() {
                 zprava = "Ukoly ulozeny.";
                 break;
             case TypPrikazu::NovySeznam:
-                if (prikaz.popis.empty()) {
-                    zprava = "Nazev nesmi byt prazdny.";
-                } else if (prikaz.popis.find(';') != std::string::npos) {
-                    zprava = "Nazev nesmi obsahovat znak ';'.";
-                } else {
+                zprava = zkontrolujNazev(prikaz.popis);
+                if (zprava.empty()) {
                     pridatSeznam(stav, prikaz.popis);
                     zprava = "Seznam '" + prikaz.popis + "' zalozen.";
                 }
@@ -155,11 +160,11 @@ int main() {
                 }
                 break;
             case TypPrikazu::PrejmenovatSeznam:
-                if (prikaz.popis.empty()) {
-                    zprava = "Nazev nesmi byt prazdny.";
-                } else if (prikaz.popis.find(';') != std::string::npos) {
-                    zprava = "Nazev nesmi obsahovat znak ';'.";
-                } else if (prejmenovatSeznam(stav.seznamy, prikaz.id, prikaz.popis)) {
+                zprava = zkontrolujNazev(prikaz.popis);
+                if (!zprava.empty()) {
+                    break;
+                }
+                if (prejmenovatSeznam(stav.seznamy, prikaz.id, prikaz.popis)) {
                     zprava = "Seznam prejmenovan na '" + prikaz.popis + "'.";
                 } else {
                     zprava = "Seznam s ID " + std::to_string(prikaz.id) + " nenalezen.";

@@ -84,6 +84,9 @@ void test_smazat_prikaz() {
     Prikaz sId = rozeberPrikaz("d 3");
     assert(sId.typ == TypPrikazu::SmazatSeznam && sId.id == 3);
     assert(rozeberPrikaz("d abc").typ == TypPrikazu::Neznamy);
+    // "-1" a "0" nesmí kolidovat se sentinelem pro "smazat aktivní"
+    assert(rozeberPrikaz("d -1").typ == TypPrikazu::Neznamy);
+    assert(rozeberPrikaz("d 0").typ == TypPrikazu::Neznamy);
 }
 
 void test_neznamy_prikaz() {
@@ -178,6 +181,12 @@ void test_parsovani_preskoci_prazdne_radky() {
     std::vector<Task> zpet = parsujUkoly("1;a;0\n\n2;b;1\n");
     assert(zpet.size() == 2);
     assert(zpet[1].description == "b" && zpet[1].done == true);
+}
+
+void test_parsovani_preskoci_poskozeny_radek() {
+    std::vector<Task> zpet = parsujUkoly("abc;x;0\n2;b;1\n");
+    assert(zpet.size() == 1);
+    assert(zpet[0].id == 2 && zpet[0].description == "b");
 }
 
 void test_serializace_seznamu() {
@@ -370,6 +379,7 @@ int main() {
     test_serializace_format();
     test_parsovani_roundtrip();
     test_parsovani_preskoci_prazdne_radky();
+    test_parsovani_preskoci_poskozeny_radek();
     test_serializace_seznamu();
     test_parsovani_seznamu_roundtrip();
     test_migrace_stareho_formatu();

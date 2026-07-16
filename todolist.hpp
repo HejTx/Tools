@@ -52,7 +52,11 @@ inline std::vector<Task> parsujUkoly(const std::string& obsah) {
         std::getline(ss, doneStr, ';');
 
         Task ukol;
-        ukol.id = std::stoi(idStr);
+        try {
+            ukol.id = std::stoi(idStr);
+        } catch (...) {
+            continue;  // poškozený řádek se přeskočí, ať migrace nespadne
+        }
         ukol.description = description;
         ukol.done = (doneStr == "1");
 
@@ -350,6 +354,11 @@ inline Prikaz rozeberPrikaz(const std::string& radek) {
             try {
                 prikaz.id = std::stoi(idStr);
             } catch (...) {
+                prikaz.typ = TypPrikazu::Neznamy;
+            }
+            // ID seznamů začínají od 1; "d -1" nesmí kolidovat se sentinelem
+            // pro "bez argumentu" a smazat aktivní seznam.
+            if (prikaz.typ == TypPrikazu::SmazatSeznam && prikaz.id < 1) {
                 prikaz.typ = TypPrikazu::Neznamy;
             }
         }
