@@ -228,6 +228,20 @@ int main() {
                 }
                 break;
             }
+            case TypPrikazu::ZmenaHesla: {
+                std::vector<unsigned char> novyKlic;
+                std::array<unsigned char, crypto_pwhash_SALTBYTES> novaSul{};
+                if (nastavNovyKlic(novyKlic, novaSul)) {
+                    klic = std::move(novyKlic);
+                    sul = novaSul;
+                    zprava = ulozSeznamy(stav, soubor, klic, sul)
+                                 ? "Heslo zmeneno a ulozeno."
+                                 : "CHYBA: Ulozeni se nezdarilo, zkus to znovu.";
+                } else {
+                    zprava = "Zmena hesla zrusena.";
+                }
+                break;
+            }
             case TypPrikazu::Zpet:
                 if (predchozi) {
                     std::swap(stav, *predchozi);
