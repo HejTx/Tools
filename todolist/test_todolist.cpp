@@ -165,6 +165,38 @@ void test_priorita_tiebreaker() {
     assert(sestavPrehled(stav)[0].seznamId == 2);  // vysoka prvni pri stejnem terminu
 }
 
+void test_archiv_prikazy() {
+    assert(rozeberPrikaz("a").typ == TypPrikazu::Archiv);
+    Prikaz p = rozeberPrikaz("ob 2");
+    assert(p.typ == TypPrikazu::Obnovit && p.id == 2);
+    assert(rozeberPrikaz("ob").typ == TypPrikazu::Neznamy);
+}
+
+void test_vytiskni_archiv() {
+    Seznam seznam;
+    seznam.id = 1;
+    seznam.nazev = "Nakup";
+    seznam.archiv = {{1, "koupeno", true, "18/07/26", 2}};
+    std::ostringstream out;
+    vytiskniArchiv(out, seznam);
+    assert(out.str() ==
+        "=== Archiv: Nakup ===\n"
+        "\033[90mID: 1, Popis: koupeno, Dokonceno: Ano, Termin: 18/07/26\033[0m\n"
+        "\n"
+        "Pokracuj stiskem Enteru...\n");
+
+    Seznam prazdny;
+    prazdny.id = 2;
+    prazdny.nazev = "Prace";
+    std::ostringstream out2;
+    vytiskniArchiv(out2, prazdny);
+    assert(out2.str() ==
+        "=== Archiv: Prace ===\n"
+        "Zadny archivovany ukol.\n"
+        "\n"
+        "Pokracuj stiskem Enteru...\n");
+}
+
 void test_napoveda_prikaz() {
     assert(rozeberPrikaz("h").typ == TypPrikazu::Napoveda);
     assert(rozeberPrikaz("h cokoli").typ == TypPrikazu::Napoveda);  // zbytek se ignoruje
@@ -202,7 +234,9 @@ void test_vytiskni_napovedu() {
         "  t <id> <datum>   Nastavi termin (dd/mm/yy); t <id> bez data termin smaze.\n"
         "  pr <id> <1-3>    Nastavi prioritu (1 vysoka, 2 normalni, 3 nizka).\n"
         "  m <id> <sid>     Presune ukol do seznamu <sid>.\n"
-        "  c                Odstrani hotove ukoly (v prehledu 0 ze vsech seznamu).\n"
+        "  c                Presune hotove ukoly do archivu (v prehledu 0 vsude).\n"
+        "  a                Zobrazi archiv hotovych ukolu aktivniho seznamu.\n"
+        "  ob <id>          Obnovi ukol z archivu (vrati se jako nehotovy).\n"
         "\n"
         "PRIKAZY SEZNAMU\n"
         "  n <nazev>        Zalozi novy seznam a prepne na nej.\n"
@@ -331,7 +365,7 @@ void test_vykresli_prazdny_seznam() {
         "Zadne ukoly.\n"
         "\n"
         "\033[90mukol: p pridat · o hotovo · r odebrat · e upravit\n"
-        "      m presunout · t termin · pr priorita · c uklidit\n"
+        "      m presunout · t termin · pr priorita · c uklidit · a archiv · ob obnovit\n"
         "seznam: n novy · v vybrat · j prejmenovat · d smazat\n"
         "jine: u zpet · z razeni · s ulozit · zh heslo · q konec · h napoveda\033[0m\n"
         "> ");
@@ -350,7 +384,7 @@ void test_vykresli_ukoly_hotovy_sede() {
         "ID: 2, Popis: uklidit, Dokonceno: Ne\n"
         "\n"
         "\033[90mukol: p pridat · o hotovo · r odebrat · e upravit\n"
-        "      m presunout · t termin · pr priorita · c uklidit\n"
+        "      m presunout · t termin · pr priorita · c uklidit · a archiv · ob obnovit\n"
         "seznam: n novy · v vybrat · j prejmenovat · d smazat\n"
         "jine: u zpet · z razeni · s ulozit · zh heslo · q konec · h napoveda\033[0m\n"
         "> ");
@@ -370,7 +404,7 @@ void test_vykresli_se_zpravou() {
         "Ukol pridan.\n"
         "\n"
         "\033[90mukol: p pridat · o hotovo · r odebrat · e upravit\n"
-        "      m presunout · t termin · pr priorita · c uklidit\n"
+        "      m presunout · t termin · pr priorita · c uklidit · a archiv · ob obnovit\n"
         "seznam: n novy · v vybrat · j prejmenovat · d smazat\n"
         "jine: u zpet · z razeni · s ulozit · zh heslo · q konec · h napoveda\033[0m\n"
         "> ");
@@ -904,6 +938,8 @@ int main() {
     test_upravit_prikaz();
     test_presunout_prikaz();
     test_bezargumentove_prikazy();
+    test_archiv_prikazy();
+    test_vytiskni_archiv();
     test_slozene_id();
     test_termin_prikaz();
     test_razeni_prikaz();

@@ -528,7 +528,8 @@ inline bool upravitUkol(std::vector<Task>& ukoly, int id, const std::string& pop
 enum class TypPrikazu { Pridat, Oznacit, Odebrat, Konec, Neznamy, Ulozit,
                         NovySeznam, VybratSeznam, PrejmenovatSeznam, SmazatSeznam,
                         Napoveda, UpravitUkol, PresunoutUkol, VycistitHotove,
-                        Zpet, ZmenaHesla, Termin, PrepnoutRazeni, Priorita };
+                        Zpet, ZmenaHesla, Termin, PrepnoutRazeni, Priorita,
+                        Archiv, Obnovit };
 
 struct Prikaz {
     TypPrikazu typ = TypPrikazu::Neznamy;
@@ -627,6 +628,11 @@ inline Prikaz rozeberPrikaz(const std::string& radek) {
         }
     } else if (token == "c") {
         prikaz.typ = TypPrikazu::VycistitHotove;
+    } else if (token == "a") {
+        prikaz.typ = TypPrikazu::Archiv;
+    } else if (token == "ob") {
+        prikaz.typ = TypPrikazu::Obnovit;
+        nactiIdArgument(ss, prikaz, prikaz.id);
     } else if (token == "u") {
         prikaz.typ = TypPrikazu::Zpet;
     } else if (token == "zh") {
@@ -676,7 +682,9 @@ inline void vytiskniNapovedu(std::ostream& out) {
            "  t <id> <datum>   Nastavi termin (dd/mm/yy); t <id> bez data termin smaze.\n"
            "  pr <id> <1-3>    Nastavi prioritu (1 vysoka, 2 normalni, 3 nizka).\n"
            "  m <id> <sid>     Presune ukol do seznamu <sid>.\n"
-           "  c                Odstrani hotove ukoly (v prehledu 0 ze vsech seznamu).\n"
+           "  c                Presune hotove ukoly do archivu (v prehledu 0 vsude).\n"
+           "  a                Zobrazi archiv hotovych ukolu aktivniho seznamu.\n"
+           "  ob <id>          Obnovi ukol z archivu (vrati se jako nehotovy).\n"
            "\n"
            "PRIKAZY SEZNAMU\n"
            "  n <nazev>        Zalozi novy seznam a prepne na nej.\n"
@@ -700,6 +708,20 @@ inline void vytiskniNapovedu(std::ostream& out) {
 
 // Vypíše řádek seznamů; při přesahu šířky zalamuje s odsazením pod
 // "Seznamy: ". Viditelná délka se počítá bez ANSI kódů (v bajtech, ASCII).
+// Modální stránka archivu aktivního seznamu (vzor: vytiskniNapovedu).
+inline void vytiskniArchiv(std::ostream& out, const Seznam& seznam, int dnes = 0) {
+    out << "=== Archiv: " << seznam.nazev << " ===\n";
+    if (seznam.archiv.empty()) {
+        out << "Zadny archivovany ukol.\n";
+    } else {
+        for (const auto& ukol : seznam.archiv) {
+            vytiskniUkol(out, ukol, "", dnes);
+        }
+    }
+    out << "\n"
+        << "Pokracuj stiskem Enteru...\n";
+}
+
 inline void vytiskniSeznamy(std::ostream& out, const StavSeznamu& stav, int sirka = 80) {
     int hotovoCelkem = 0;
     int celkem = 0;
@@ -777,7 +799,7 @@ inline void vykresliObrazovku(std::ostream& out,
         out << zprava << "\n\n";
     }
     out << "\033[90mukol: p pridat · o hotovo · r odebrat · e upravit\n"
-           "      m presunout · t termin · pr priorita · c uklidit\n"
+           "      m presunout · t termin · pr priorita · c uklidit · a archiv · ob obnovit\n"
            "seznam: n novy · v vybrat · j prejmenovat · d smazat\n"
            "jine: u zpet · z razeni · s ulozit · zh heslo · q konec · h napoveda\033[0m\n"
         << "> ";
