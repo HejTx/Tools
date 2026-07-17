@@ -47,6 +47,9 @@ inline std::string zkontrolujNazevSeznamu(const std::string& nazev) {
     if (nazev.find(';') != std::string::npos) return "Nazev nesmi obsahovat znak ';'.";
     if (nazev.find('/') != std::string::npos) return "Nazev nesmi obsahovat znak '/'.";
     if (nazev[0] == '.') return "Nazev nesmi zacinat teckou.";
+    if (nazev.size() >= 7 && nazev.substr(nazev.size() - 7) == ".hotove") {
+        return "Nazev nesmi koncit na '.hotove'.";  // koliduje s archivnimi soubory
+    }
     return "";
 }
 
@@ -146,6 +149,7 @@ struct Seznam {
     int id;
     std::string nazev;
     std::vector<Task> ukoly;                                    // jen odemčené
+    std::vector<Task> archiv;   // hotové přesunuté příkazem c (jen odemčené)
     bool odemceno = true;   // pahýly (jen název) vytváří pouze startovní sken
     std::vector<unsigned char> klic;                            // jen odemčené
     std::array<unsigned char, crypto_pwhash_SALTBYTES> sul{};   // jen odemčené
@@ -179,6 +183,10 @@ inline std::string serializujSeznamy(const StavSeznamu& stav) {
         out << "#seznam;" << seznam.id << ";" << seznam.nazev
             << (seznam.odemceno ? "" : ";zamceno") << "\n"
             << serializujUkoly(seznam.ukoly);
+        for (const auto& ukol : seznam.archiv) {
+            out << "~" << ukol.id << ";" << ukol.description << ";" << ukol.done
+                << ";" << ukol.termin << ";" << ukol.priorita << "\n";
+        }
     }
     return out.str();
 }
@@ -210,6 +218,7 @@ inline StavSeznamu parsujSeznamy(const std::string& obsah) {
     };
 
     while (std::getline(in, line)) {
+        if (!line.empty() && line[0] == '~') continue;  // archivní řádky (jen pro porovnání)
         if (line.rfind("@razeni;", 0) == 0) {
             try {
                 stav.razeni = std::stoi(line.substr(std::string("@razeni;").size()));
@@ -453,13 +462,34 @@ inline bool oznacitUkolDokonceny(std::vector<Task>& ukoly, int id) {
     return false;
 }
 
-// Odstraní hotové úkoly; vrací jejich počet.
-inline int vycistiHotove(std::vector<Task>& ukoly) {
-    auto it = std::remove_if(ukoly.begin(), ukoly.end(),
-                             [](const Task& ukol) { return ukol.done; });
-    int pocet = static_cast<int>(ukoly.end() - it);
-    ukoly.erase(it, ukoly.end());
+// Přesune hotové úkoly do archivu (dostanou nová archivní ID); vrací počet.
+inline int archivujHotove(Seznam& seznam) {
+    int pocet = 0;
+    std::vector<Task> zbyle;
+    for (auto& ukol : seznam.ukoly) {
+        if (ukol.done) {
+            ukol.id = seznam.archiv.empty() ? 1 : seznam.archiv.back().id + 1;
+            seznam.archiv.push_back(ukol);
+            ++pocet;
+        } else {
+            zbyle.push_back(ukol);
+        }
+    }
+    seznam.ukoly = std::move(zbyle);
     return pocet;
+}
+
+// Vrátí úkol z archivu mezi aktivní (nové ID, done = false). false = nenalezen.
+inline bool obnovUkol(Seznam& seznam, int archivId) {
+    auto it = std::find_if(seznam.archiv.begin(), seznam.archiv.end(),
+                           [archivId](const Task& ukol) { return ukol.id == archivId; });
+    if (it == seznam.archiv.end()) return false;
+    Task obnoveny = *it;
+    seznam.archiv.erase(it);
+    obnoveny.id = seznam.ukoly.empty() ? 1 : seznam.ukoly.back().id + 1;
+    obnoveny.done = false;
+    seznam.ukoly.push_back(obnoveny);
+    return true;
 }
 
 // Nastaví (či prázdným řetězcem smaže) termín úkolu.

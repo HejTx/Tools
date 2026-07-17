@@ -728,11 +728,51 @@ void test_upravit_ukol() {
     assert(!upravitUkol(ukoly, 99, "x"));
 }
 
-void test_vycisti_hotove() {
-    std::vector<Task> ukoly = {{1, "a", true}, {2, "b", false}, {3, "c", true}};
-    assert(vycistiHotove(ukoly) == 2);
-    assert(ukoly.size() == 1 && ukoly[0].description == "b");
-    assert(vycistiHotove(ukoly) == 0);
+void test_archivuj_hotove() {
+    Seznam seznam;
+    seznam.id = 1;
+    seznam.nazev = "A";
+    seznam.ukoly = {{1, "hotovy1", true, "18/07/26", 1}, {2, "nehotovy", false}, {3, "hotovy2", true}};
+    seznam.archiv = {{4, "stary", true}};
+    assert(archivujHotove(seznam) == 2);
+    assert(seznam.ukoly.size() == 1 && seznam.ukoly[0].id == 2);
+    assert(seznam.archiv.size() == 3);
+    assert(seznam.archiv[1].id == 5 && seznam.archiv[1].description == "hotovy1");
+    assert(seznam.archiv[1].termin == "18/07/26" && seznam.archiv[1].priorita == 1);
+    assert(seznam.archiv[2].id == 6 && seznam.archiv[2].description == "hotovy2");
+    assert(archivujHotove(seznam) == 0);
+}
+
+void test_obnov_ukol() {
+    Seznam seznam;
+    seznam.id = 1;
+    seznam.nazev = "A";
+    seznam.ukoly = {{7, "aktivni", false}};
+    seznam.archiv = {{1, "obnovit me", true, "20/08/26", 3}};
+    assert(obnovUkol(seznam, 1));
+    assert(seznam.archiv.empty());
+    assert(seznam.ukoly.size() == 2);
+    assert(seznam.ukoly[1].id == 8);                  // nove ID v seznamu
+    assert(seznam.ukoly[1].done == false);            // vraci se nehotovy
+    assert(seznam.ukoly[1].termin == "20/08/26" && seznam.ukoly[1].priorita == 3);
+    assert(!obnovUkol(seznam, 99));
+}
+
+void test_nazev_hotove_suffix() {
+    assert(zkontrolujNazevSeznamu("Nakup.hotove") == "Nazev nesmi koncit na '.hotove'.");
+    assert(zkontrolujNazevSeznamu("hotove") == "");
+}
+
+void test_serializace_archivu() {
+    StavSeznamu stav;
+    stav.aktivniId = 1;
+    stav.seznamy = {{1, "A", {{1, "aktivni", false}}}};
+    stav.seznamy[0].archiv = {{1, "archivni", true, "18/07/26", 2}};
+    assert(serializujSeznamy(stav) ==
+        "@aktivni;1\n@razeni;1\n#seznam;1;A\n1;aktivni;0;;2\n~1;archivni;1;18/07/26;2\n");
+    // parsovani radky s ~ preskakuje
+    StavSeznamu zpet = parsujSeznamy(serializujSeznamy(stav));
+    assert(zpet.seznamy[0].ukoly.size() == 1);
 }
 
 void test_presun_ukolu() {
@@ -914,7 +954,10 @@ int main() {
     test_smazat_aktivni_seznam();
     test_smazat_posledni_seznam();
     test_upravit_ukol();
-    test_vycisti_hotove();
+    test_archivuj_hotove();
+    test_obnov_ukol();
+    test_nazev_hotove_suffix();
+    test_serializace_archivu();
     test_presun_ukolu();
     test_nastav_termin();
     test_presun_z_jineho_seznamu();
