@@ -397,12 +397,16 @@ inline void vytiskniUkol(std::ostream& out, const Task& ukol,
                          const std::string& prefixId = "", int dnes = 0) {
     bool prosly = !ukol.done && !ukol.termin.empty()
                   && dnes != 0 && klicTerminu(ukol.termin) < dnes;
+    bool vysoka = !ukol.done && !prosly && ukol.priorita == 1;
     if (ukol.done) out << "\033[90m";
     else if (prosly) out << "\033[31m";
+    else if (vysoka) out << "\033[33m";
     out << "ID: " << prefixId << ukol.id << ", Popis: " << ukol.description
         << ", Dokonceno: " << (ukol.done ? "Ano" : "Ne");
     if (!ukol.termin.empty()) out << ", Termin: " << ukol.termin;
-    if (ukol.done || prosly) out << "\033[0m";
+    if (ukol.priorita == 1) out << ", Priorita: vysoka";
+    else if (ukol.priorita == 3) out << ", Priorita: nizka";
+    if (ukol.done || prosly || vysoka) out << "\033[0m";
     out << "\n";
 }
 
@@ -640,6 +644,7 @@ inline void vytiskniNapovedu(std::ostream& out) {
            "  r <id>           Odebere ukol ze seznamu.\n"
            "  e <id> <popis>   Upravi popis ukolu.\n"
            "  t <id> <datum>   Nastavi termin (dd/mm/yy); t <id> bez data termin smaze.\n"
+           "  pr <id> <1-3>    Nastavi prioritu (1 vysoka, 2 normalni, 3 nizka).\n"
            "  m <id> <sid>     Presune ukol do seznamu <sid>.\n"
            "  c                Odstrani hotove ukoly (v prehledu 0 ze vsech seznamu).\n"
            "\n"
@@ -741,8 +746,9 @@ inline void vykresliObrazovku(std::ostream& out,
     if (!zprava.empty()) {
         out << zprava << "\n\n";
     }
-    out << "\033[90mukol: p pridat · o hotovo · r odebrat · e upravit · m presunout · t termin\n"
-           "seznam: n novy · v vybrat · j prejmenovat · d smazat · c uklidit\n"
+    out << "\033[90mukol: p pridat · o hotovo · r odebrat · e upravit\n"
+           "      m presunout · t termin · pr priorita · c uklidit\n"
+           "seznam: n novy · v vybrat · j prejmenovat · d smazat\n"
            "jine: u zpet · z razeni · s ulozit · zh heslo · q konec · h napoveda\033[0m\n"
         << "> ";
 }

@@ -200,6 +200,7 @@ void test_vytiskni_napovedu() {
         "  r <id>           Odebere ukol ze seznamu.\n"
         "  e <id> <popis>   Upravi popis ukolu.\n"
         "  t <id> <datum>   Nastavi termin (dd/mm/yy); t <id> bez data termin smaze.\n"
+        "  pr <id> <1-3>    Nastavi prioritu (1 vysoka, 2 normalni, 3 nizka).\n"
         "  m <id> <sid>     Presune ukol do seznamu <sid>.\n"
         "  c                Odstrani hotove ukoly (v prehledu 0 ze vsech seznamu).\n"
         "\n"
@@ -280,6 +281,27 @@ void test_vykresli_s_proslym() {
         != std::string::npos);
 }
 
+void test_priorita_zobrazeni() {
+    std::ostringstream vysoka;
+    vytiskniUkol(vysoka, {1, "dulezity", false, "", 1});
+    assert(vysoka.str() ==
+        "\033[33mID: 1, Popis: dulezity, Dokonceno: Ne, Priorita: vysoka\033[0m\n");
+
+    std::ostringstream nizka;  // nizka bez barvy, se suffixem
+    vytiskniUkol(nizka, {2, "vedlejsi", false, "", 3});
+    assert(nizka.str() == "ID: 2, Popis: vedlejsi, Dokonceno: Ne, Priorita: nizka\n");
+
+    std::ostringstream hotovyVysoky;  // seda ma prednost
+    vytiskniUkol(hotovyVysoky, {3, "hotovy", true, "", 1});
+    assert(hotovyVysoky.str() ==
+        "\033[90mID: 3, Popis: hotovy, Dokonceno: Ano, Priorita: vysoka\033[0m\n");
+
+    std::ostringstream proslyVysoky;  // cervena prebiji zlutou
+    vytiskniUkol(proslyVysoky, {4, "prosly", false, "18/07/26", 1}, "", 260719);
+    assert(proslyVysoky.str() ==
+        "\033[31mID: 4, Popis: prosly, Dokonceno: Ne, Termin: 18/07/26, Priorita: vysoka\033[0m\n");
+}
+
 void test_vykresli_prehled() {
     StavSeznamu stav;
     stav.seznamy = {
@@ -308,8 +330,9 @@ void test_vykresli_prazdny_seznam() {
         "=== Ukoly === (razeni: ID)\n"
         "Zadne ukoly.\n"
         "\n"
-        "\033[90mukol: p pridat · o hotovo · r odebrat · e upravit · m presunout · t termin\n"
-        "seznam: n novy · v vybrat · j prejmenovat · d smazat · c uklidit\n"
+        "\033[90mukol: p pridat · o hotovo · r odebrat · e upravit\n"
+        "      m presunout · t termin · pr priorita · c uklidit\n"
+        "seznam: n novy · v vybrat · j prejmenovat · d smazat\n"
         "jine: u zpet · z razeni · s ulozit · zh heslo · q konec · h napoveda\033[0m\n"
         "> ");
 }
@@ -326,8 +349,9 @@ void test_vykresli_ukoly_hotovy_sede() {
         "\033[90mID: 1, Popis: nakoupit, Dokonceno: Ano\033[0m\n"
         "ID: 2, Popis: uklidit, Dokonceno: Ne\n"
         "\n"
-        "\033[90mukol: p pridat · o hotovo · r odebrat · e upravit · m presunout · t termin\n"
-        "seznam: n novy · v vybrat · j prejmenovat · d smazat · c uklidit\n"
+        "\033[90mukol: p pridat · o hotovo · r odebrat · e upravit\n"
+        "      m presunout · t termin · pr priorita · c uklidit\n"
+        "seznam: n novy · v vybrat · j prejmenovat · d smazat\n"
         "jine: u zpet · z razeni · s ulozit · zh heslo · q konec · h napoveda\033[0m\n"
         "> ");
 }
@@ -345,8 +369,9 @@ void test_vykresli_se_zpravou() {
         "\n"
         "Ukol pridan.\n"
         "\n"
-        "\033[90mukol: p pridat · o hotovo · r odebrat · e upravit · m presunout · t termin\n"
-        "seznam: n novy · v vybrat · j prejmenovat · d smazat · c uklidit\n"
+        "\033[90mukol: p pridat · o hotovo · r odebrat · e upravit\n"
+        "      m presunout · t termin · pr priorita · c uklidit\n"
+        "seznam: n novy · v vybrat · j prejmenovat · d smazat\n"
         "jine: u zpet · z razeni · s ulozit · zh heslo · q konec · h napoveda\033[0m\n"
         "> ");
 }
@@ -850,6 +875,7 @@ int main() {
     test_vytiskni_seznamy();
     test_vytiskni_seznamy_zalamovani();
     test_vytiskni_seznamy_uzka_obrazovka();
+    test_priorita_zobrazeni();
     test_vytiskni_prosly_cervene();
     test_vykresli_s_proslym();
     test_vykresli_prehled();

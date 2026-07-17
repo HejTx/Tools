@@ -436,6 +436,28 @@ int main() {
                 }
                 break;
             }
+            case TypPrikazu::Priorita: {
+                Seznam* cil = najdiCilUkolu(prikaz, zprava);
+                if (!cil) break;
+                int priorita = 2;
+                if (!prikaz.popis.empty()) {
+                    try {
+                        priorita = std::stoi(prikaz.popis);
+                    } catch (...) {
+                        priorita = -1;
+                    }
+                }
+                if (priorita < 1 || priorita > 3) {
+                    zprava = "Neplatna priorita, pouzij 1-3.";
+                } else if (!nastavPrioritu(cil->ukoly, prikaz.id, priorita)) {
+                    zprava = "Ukol s ID " + std::to_string(prikaz.id) + " nenalezen.";
+                } else {
+                    zprava = (priorita == 1)   ? "Priorita nastavena na vysokou."
+                             : (priorita == 3) ? "Priorita nastavena na nizkou."
+                                               : "Priorita nastavena na normalni.";
+                }
+                break;
+            }
             case TypPrikazu::PrepnoutRazeni:
                 stav.razeni = (stav.razeni == 2) ? 1 : 2;
                 zprava = (stav.razeni == 2) ? "Razeni: podle terminu." : "Razeni: podle ID.";
