@@ -28,7 +28,8 @@ a `ob <id>` (obnovit). Archiv je na seznam a šifruje se stejným heslem.
 - `Seznam` dostane `std::vector<Task> archiv;` (plní se při odemčení).
 - `archivujHotove(Seznam&)` → int: přesune hotové z `ukoly` do `archiv`
   (nová archivní ID, pořadí zachováno). Volá ho `c` (aktivní seznam;
-  v přehledu 0 všechny odemčené). Hlášky `c` beze změny (počet).
+  v přehledu 0 všechny odemčené). Hlášky `c` nově pravdivé:
+  „Do archivu presunuto ukolu: X." / „Zadne hotove ukoly k presunuti."
 - `obnovUkol(Seznam&, int archivId)` → bool: vyjme z archivu, přidá do
   `ukoly` s novým ID seznamu, `done = false`, termín a priorita
   zůstávají.
