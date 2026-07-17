@@ -184,6 +184,33 @@ bool migrujStaryFormat(const std::string& staraCesta, const std::string& adresar
     return true;
 }
 
+bool jeGitRepo(const std::string& adresar) {
+    return std::filesystem::exists(
+        std::filesystem::path(adresar.empty() ? "." : adresar) / ".git");
+}
+
+// Spustí git příkaz tiše; true = návratový kód 0.
+bool spustGit(const std::string& adresar, const std::string& argumenty) {
+    std::string prikaz = sestavGitPrikaz(adresar.empty() ? "." : adresar, argumenty)
+                         + " >/dev/null 2>&1";
+    return std::system(prikaz.c_str()) == 0;
+}
+
+// Stdout git příkazu; "" při chybě.
+std::string vystupGitu(const std::string& adresar, const std::string& argumenty) {
+    std::string prikaz = sestavGitPrikaz(adresar.empty() ? "." : adresar, argumenty)
+                         + " 2>/dev/null";
+    FILE* roura = popen(prikaz.c_str(), "r");
+    if (!roura) return "";
+    std::string vystup;
+    char buf[256];
+    while (fgets(buf, sizeof(buf), roura)) {
+        vystup += buf;
+    }
+    pclose(roura);
+    return vystup;
+}
+
 // Načte archiv seznamu týmž heslem; nedešifrovatelný soubor odloží stranou.
 void nactiArchiv(Seznam& seznam, const std::string& cesta, const std::string& heslo) {
     std::optional<std::string> obsah = nactiObsahSouboru(cesta);
@@ -210,6 +237,19 @@ int main() {
     }
     Nastaveni nastaveni =
         parsujNastaveni(nactiObsahSouboru(cestaNastaveni(adresar)).value_or(""));
+
+    const bool synchronizace = jeGitRepo(adresar);
+    if (synchronizace) {
+        std::string gitignore = adresar.empty() ? ".gitignore" : adresar + "/.gitignore";
+        if (!std::filesystem::exists(gitignore)) {
+            std::ofstream gi(gitignore);
+            gi << "nastaveni.txt\n*.tmp\n*.poskozeny\n";
+        }
+        if (!spustGit(adresar, "pull --ff-only --quiet")) {
+            std::cout << "Synchronizace: pull se nezdaril"
+                         " (offline, nebo mistni a vzdalene zmeny koliduji).\n";
+        }
+    }
 
     // sken trezorů -> pahýly (abecedně, ID 1..n)
     auto nactiPahyly = [&]() {
@@ -320,6 +360,7 @@ int main() {
     std::optional<StavSeznamu> predchozi;
 
     std::set<std::string> odemceneNazvy;  // pro mazání souborů odstraněných seznamů
+    bool syncSelhala = false;             // výsledek posledního commit+push
     for (const auto& seznam : stav.seznamy) {
         if (seznam.odemceno) odemceneNazvy.insert(seznam.nazev);
     }
@@ -362,6 +403,15 @@ int main() {
         if (!posledniAktivni.empty()) nastaveni.posledni = posledniAktivni;
         std::ofstream vystup(cestaNastaveni(adresar), std::ios::binary);
         vystup << serializujNastaveni(nastaveni);
+
+        syncSelhala = false;
+        if (synchronizace && ok) {
+            spustGit(adresar, "add -A");
+            spustGit(adresar, "commit -m ulozeni --quiet");  // nic ke commitu != chyba
+            if (!spustGit(adresar, "push --quiet")) {
+                syncSelhala = true;
+            }
+        }
         return ok;
     };
 
@@ -403,7 +453,8 @@ int main() {
         bool sledovatZmenu =
             prikaz.typ != TypPrikazu::Zpet && prikaz.typ != TypPrikazu::Ulozit &&
             prikaz.typ != TypPrikazu::Napoveda && prikaz.typ != TypPrikazu::ZmenaHesla &&
-            prikaz.typ != TypPrikazu::Archiv && prikaz.typ != TypPrikazu::Neznamy;
+            prikaz.typ != TypPrikazu::Archiv && prikaz.typ != TypPrikazu::Verze &&
+            prikaz.typ != TypPrikazu::Neznamy;
         bool preskocSnapshot = false;
         StavSeznamu zaloha;
         if (sledovatZmenu) zaloha = stav;
@@ -564,9 +615,15 @@ int main() {
                 break;
             }
             case TypPrikazu::Ulozit:
-                zprava = ulozVse()
-                             ? "Ukoly ulozeny."
-                             : "CHYBA: Ulozeni se nezdarilo, zkus to znovu.";
+                if (!ulozVse()) {
+                    zprava = "CHYBA: Ulozeni se nezdarilo, zkus to znovu.";
+                } else if (!synchronizace) {
+                    zprava = "Ukoly ulozeny.";
+                } else if (syncSelhala) {
+                    zprava = "Ukoly ulozeny mistne, synchronizace se nezdarila (offline?).";
+                } else {
+                    zprava = "Ukoly ulozeny a synchronizovany.";
+                }
                 break;
             case TypPrikazu::NovySeznam: {
                 zprava = zkontrolujNazevSeznamu(prikaz.popis);
@@ -723,6 +780,70 @@ int main() {
                     zprava = "Neni co vratit.";
                 }
                 break;
+            case TypPrikazu::Verze: {
+                if (!synchronizace) {
+                    zprava = "Synchronizace neni zapnuta (datovy adresar neni git repozitar).";
+                    break;
+                }
+                if (stav.aktivniId == 0) {
+                    zprava = "Prepni na konkretni seznam.";
+                    break;
+                }
+                Seznam* aktivni = najdiSeznam(stav.seznamy, stav.aktivniId);
+                std::string relSoubor = "seznamy/" + aktivni->nazev + ".txt";
+                std::vector<VerzeZaznam> verze = parsujVerze(vystupGitu(adresar,
+                    "log --format=%h;%ad --date=format:\"%d/%m/%y %H:%M\" -- \"" + relSoubor + "\""));
+                if (prikaz.id == -1) {
+                    std::cout << "\033[2J\033[H";
+                    vytiskniVerze(std::cout, aktivni->nazev, verze);
+                    std::string zahodit;
+                    if (!std::getline(std::cin, zahodit)) {
+                        prikaz.typ = TypPrikazu::Konec;
+                    }
+                    zprava.clear();
+                    break;
+                }
+                if (prikaz.id > static_cast<int>(verze.size())) {
+                    zprava = "Verze " + std::to_string(prikaz.id) + " nenalezena.";
+                    break;
+                }
+                // aktualni stav nejdriv na disk a do historie — i obnova je jen dalsi verzi
+                ulozSeznamDoSouboru(*aktivni, cestaSeznamu(adresar, aktivni->nazev));
+                std::string archivCesta = cestaArchivu(adresar, aktivni->nazev);
+                if (aktivni->archiv.empty()) {
+                    std::remove(archivCesta.c_str());
+                } else {
+                    ulozUkolyDoSouboru(aktivni->archiv, aktivni->klic, aktivni->sul, archivCesta);
+                }
+                spustGit(adresar, "add -A");
+                spustGit(adresar, "commit -m pred-obnovou --quiet");
+                const std::string& hash = verze[prikaz.id - 1].hash;
+                if (!spustGit(adresar, "checkout " + hash + " -- \"" + relSoubor + "\"")) {
+                    zprava = "Obnoveni verze se nezdarilo.";
+                    break;
+                }
+                std::string relArchiv = "seznamy/" + aktivni->nazev + ".hotove.txt";
+                if (spustGit(adresar, "cat-file -e " + hash + ":\"" + relArchiv + "\"")) {
+                    spustGit(adresar, "checkout " + hash + " -- \"" + relArchiv + "\"");
+                } else {
+                    std::remove(archivCesta.c_str());
+                }
+                int seznamId = aktivni->id;
+                aktivni->odemceno = false;
+                aktivni->ukoly.clear();
+                aktivni->archiv.clear();
+                aktivni->klic.clear();
+                stav.aktivniId = 0;
+                for (const auto& seznam : stav.seznamy) {
+                    if (seznam.odemceno) {
+                        stav.aktivniId = seznam.id;
+                        break;
+                    }
+                }
+                zprava = "Verze obnovena; seznam je zamceny, odemkni ho pres v "
+                         + std::to_string(seznamId) + ".";
+                break;
+            }
             case TypPrikazu::Napoveda: {
                 std::cout << "\033[2J\033[H";
                 vytiskniNapovedu(std::cout);
@@ -748,7 +869,11 @@ int main() {
     }
 
     if (ulozVse()) {
-        std::cout << "\nUkoly ulozeny. Nashledanou.\n";
+        if (synchronizace && syncSelhala) {
+            std::cout << "\nUkoly ulozeny mistne (synchronizace se nezdarila). Nashledanou.\n";
+        } else {
+            std::cout << "\nUkoly ulozeny. Nashledanou.\n";
+        }
         return 0;
     }
     std::cout << "\nPOZOR: Ukoly se nepodarilo ulozit!\n";
