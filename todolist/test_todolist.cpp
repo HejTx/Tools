@@ -627,6 +627,11 @@ void test_kontrola_nazvu_seznamu() {
     assert(zkontrolujNazevSeznamu("a;b") == "Nazev nesmi obsahovat znak ';'.");
     assert(zkontrolujNazevSeznamu("a/b") == "Nazev nesmi obsahovat znak '/'.");
     assert(zkontrolujNazevSeznamu(".skryty") == "Nazev nesmi zacinat teckou.");
+    // znaky nebezpecne pro shell (git prikazy) jsou zakazane
+    assert(zkontrolujNazevSeznamu("a\"b") == "Nazev nesmi obsahovat znaky \" ` $ \\.");
+    assert(zkontrolujNazevSeznamu("a$b") == "Nazev nesmi obsahovat znaky \" ` $ \\.");
+    assert(zkontrolujNazevSeznamu("a`b") == "Nazev nesmi obsahovat znaky \" ` $ \\.");
+    assert(zkontrolujNazevSeznamu("a\\b") == "Nazev nesmi obsahovat znaky \" ` $ \\.");
 }
 
 void test_nastaveni_roundtrip() {

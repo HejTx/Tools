@@ -81,6 +81,29 @@ Pozn.: **názvy** seznamů jsou zároveň názvy souborů, takže šifrovaný je
 obsah úkolů, nikoli jména seznamů. Starší jednosouborový formát
 (`ukoly.txt`) se při prvním spuštění automaticky rozdělí na trezory.
 
+### Synchronizace mezi zařízeními (git)
+
+Když je datový adresář git repozitář, aplikace se sama synchronizuje:
+při startu stáhne změny (`git pull --ff-only`), při každém uložení
+commitne a pushne. Offline se nic neztrácí — commity odejdou při
+příštím uložení.
+
+Zřízení (jednou): založ **soukromý** repozitář (obsah trezorů je
+šifrovaný, ale názvy seznamů jsou vidět jako názvy souborů) a pak:
+
+```bash
+# prvni zarizeni (existujici data):
+cd ~/.local/share/todolist
+git init && git remote add origin git@github.com:TY/todolist-data.git
+# dalsi zarizeni:
+git clone git@github.com:TY/todolist-data.git ~/.local/share/todolist
+```
+
+Každé uložení je snímek v historii. Příkaz `vz` vypíše verze aktivního
+seznamu, `vz <n>` verzi obnoví (aktuální stav se předtím commitne,
+takže i obnova je vratná). Obnovený seznam se zamkne — odemkneš ho
+heslem platným v době snímku, takže funguje i návrat před změnu hesla.
+
 ### Vývoj
 
 Psáno testově (plain-assert testy v `todolist/test_todolist.cpp`,

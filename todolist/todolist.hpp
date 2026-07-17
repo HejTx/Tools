@@ -46,6 +46,9 @@ inline std::string zkontrolujNazevSeznamu(const std::string& nazev) {
     if (nazev.empty()) return "Nazev nesmi byt prazdny.";
     if (nazev.find(';') != std::string::npos) return "Nazev nesmi obsahovat znak ';'.";
     if (nazev.find('/') != std::string::npos) return "Nazev nesmi obsahovat znak '/'.";
+    if (nazev.find_first_of("\"`$\\") != std::string::npos) {
+        return "Nazev nesmi obsahovat znaky \" ` $ \\.";  // názvy jdou do shellových příkazů
+    }
     if (nazev[0] == '.') return "Nazev nesmi zacinat teckou.";
     if (nazev.size() >= 7 && nazev.substr(nazev.size() - 7) == ".hotove") {
         return "Nazev nesmi koncit na '.hotove'.";  // koliduje s archivnimi soubory

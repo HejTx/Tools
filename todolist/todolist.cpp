@@ -792,7 +792,7 @@ int main() {
                 Seznam* aktivni = najdiSeznam(stav.seznamy, stav.aktivniId);
                 std::string relSoubor = "seznamy/" + aktivni->nazev + ".txt";
                 std::vector<VerzeZaznam> verze = parsujVerze(vystupGitu(adresar,
-                    "log --format=%h;%ad --date=format:\"%d/%m/%y %H:%M\" -- \"" + relSoubor + "\""));
+                    "log --format=\"%h;%ad\" --date=format:\"%d/%m/%y %H:%M\" -- \"" + relSoubor + "\""));
                 if (prikaz.id == -1) {
                     std::cout << "\033[2J\033[H";
                     vytiskniVerze(std::cout, aktivni->nazev, verze);
