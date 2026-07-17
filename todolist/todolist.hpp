@@ -81,6 +81,48 @@ inline Nastaveni parsujNastaveni(const std::string& obsah) {
     return nastaveni;
 }
 
+struct VerzeZaznam {
+    std::string hash;
+    std::string datum;
+};
+
+// Sestaví git příkaz nad datovým adresářem (adresář v uvozovkách).
+inline std::string sestavGitPrikaz(const std::string& adresar, const std::string& argumenty) {
+    return "git -C \"" + adresar + "\" " + argumenty;
+}
+
+// Rozparsuje výstup `git log --format=%h;%ad` (řádek = hash;datum).
+inline std::vector<VerzeZaznam> parsujVerze(const std::string& vystup) {
+    std::vector<VerzeZaznam> verze;
+    std::istringstream in(vystup);
+    std::string line;
+    while (std::getline(in, line)) {
+        size_t oddelovac = line.find(';');
+        if (oddelovac == std::string::npos || oddelovac == 0 || oddelovac + 1 >= line.size()) {
+            continue;
+        }
+        verze.push_back({line.substr(0, oddelovac), line.substr(oddelovac + 1)});
+    }
+    return verze;
+}
+
+// Modální stránka verzí seznamu (vzor: vytiskniNapovedu).
+inline void vytiskniVerze(std::ostream& out, const std::string& nazev,
+                          const std::vector<VerzeZaznam>& verze) {
+    out << "=== Verze: " << nazev << " ===\n";
+    if (verze.empty()) {
+        out << "Zadna ulozena verze.\n";
+    } else {
+        for (size_t i = 0; i < verze.size(); ++i) {
+            out << "[" << (i + 1) << "] " << verze[i].datum << "\n";
+        }
+        out << "\n"
+            << "Obnovis prikazem vz <cislo>.\n";
+    }
+    out << "\n"
+        << "Pokracuj stiskem Enteru...\n";
+}
+
 // Podíl hotových úkolů jako "50.0%"; prázdno = "0.0%".
 inline std::string formatujProcenta(int hotovo, int celkem) {
     double procenta = (celkem == 0) ? 0.0 : 100.0 * hotovo / celkem;
@@ -535,7 +577,7 @@ enum class TypPrikazu { Pridat, Oznacit, Odebrat, Konec, Neznamy, Ulozit,
                         NovySeznam, VybratSeznam, PrejmenovatSeznam, SmazatSeznam,
                         Napoveda, UpravitUkol, PresunoutUkol, VycistitHotove,
                         Zpet, ZmenaHesla, Termin, PrepnoutRazeni, Priorita,
-                        Archiv, Obnovit };
+                        Archiv, Obnovit, Verze };
 
 struct Prikaz {
     TypPrikazu typ = TypPrikazu::Neznamy;
@@ -646,6 +688,20 @@ inline Prikaz rozeberPrikaz(const std::string& radek) {
     } else if (token == "n") {
         prikaz.typ = TypPrikazu::NovySeznam;
         prikaz.popis = zbytekRadku(ss);
+    } else if (token == "vz") {
+        prikaz.typ = TypPrikazu::Verze;
+        std::string idStr;
+        if (ss >> idStr) {
+            try {
+                prikaz.id = std::stoi(idStr);
+            } catch (...) {
+                prikaz.typ = TypPrikazu::Neznamy;
+            }
+            if (prikaz.typ == TypPrikazu::Verze && prikaz.id < 1) {
+                prikaz.typ = TypPrikazu::Neznamy;
+            }
+        }
+        // bez cisla: id zustava -1 = vypis verzi
     } else if (token == "v") {
         prikaz.typ = TypPrikazu::VybratSeznam;
         nactiIdArgument(ss, prikaz, prikaz.id);
@@ -702,6 +758,7 @@ inline void vytiskniNapovedu(std::ostream& out) {
            "OSTATNI\n"
            "  u                Vrati posledni zmenu (u znovu = zpet).\n"
            "  z                Prepina razeni: podle ID / podle terminu.\n"
+           "  vz [n]           Verze aktivniho seznamu; vz <n> obnovi verzi n.\n"
            "  s                Ulozi vsechny seznamy.\n"
            "  q                Ulozi a ukonci program.\n"
            "  zh               Zmeni heslo souboru.\n"
@@ -807,6 +864,6 @@ inline void vykresliObrazovku(std::ostream& out,
     out << "\033[90mukol: p pridat · o hotovo · r odebrat · e upravit\n"
            "      m presunout · t termin · pr priorita · c uklidit · a archiv · ob obnovit\n"
            "seznam: n novy · v vybrat · j prejmenovat · d smazat\n"
-           "jine: u zpet · z razeni · s ulozit · zh heslo · q konec · h napoveda\033[0m\n"
+           "jine: u zpet · z razeni · s ulozit · zh heslo · q konec · h napoveda · vz verze\033[0m\n"
         << "> ";
 }

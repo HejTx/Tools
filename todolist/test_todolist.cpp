@@ -197,6 +197,50 @@ void test_vytiskni_archiv() {
         "Pokracuj stiskem Enteru...\n");
 }
 
+void test_sestav_git_prikaz() {
+    assert(sestavGitPrikaz("/data/dir", "pull --ff-only") == "git -C \"/data/dir\" pull --ff-only");
+    assert(sestavGitPrikaz("s mezerou", "add -A") == "git -C \"s mezerou\" add -A");
+}
+
+void test_parsuj_verze() {
+    std::vector<VerzeZaznam> verze = parsujVerze("abc123;17/07/26 22:31\ndef456;16/07/26 08:15\n");
+    assert(verze.size() == 2);
+    assert(verze[0].hash == "abc123" && verze[0].datum == "17/07/26 22:31");
+    assert(verze[1].hash == "def456");
+    assert(parsujVerze("").empty());
+    assert(parsujVerze("bezstrednika\n;bezhashe\n").empty());  // poskozene radky se preskoci
+}
+
+void test_vytiskni_verze() {
+    std::ostringstream out;
+    vytiskniVerze(out, "Nakup", {{"abc123", "17/07/26 22:31"}, {"def456", "16/07/26 08:15"}});
+    assert(out.str() ==
+        "=== Verze: Nakup ===\n"
+        "[1] 17/07/26 22:31\n"
+        "[2] 16/07/26 08:15\n"
+        "\n"
+        "Obnovis prikazem vz <cislo>.\n"
+        "\n"
+        "Pokracuj stiskem Enteru...\n");
+
+    std::ostringstream out2;
+    vytiskniVerze(out2, "Prace", {});
+    assert(out2.str() ==
+        "=== Verze: Prace ===\n"
+        "Zadna ulozena verze.\n"
+        "\n"
+        "Pokracuj stiskem Enteru...\n");
+}
+
+void test_verze_prikaz() {
+    Prikaz vypis = rozeberPrikaz("vz");
+    assert(vypis.typ == TypPrikazu::Verze && vypis.id == -1);
+    Prikaz obnova = rozeberPrikaz("vz 3");
+    assert(obnova.typ == TypPrikazu::Verze && obnova.id == 3);
+    assert(rozeberPrikaz("vz 0").typ == TypPrikazu::Neznamy);
+    assert(rozeberPrikaz("vz x").typ == TypPrikazu::Neznamy);
+}
+
 void test_napoveda_prikaz() {
     assert(rozeberPrikaz("h").typ == TypPrikazu::Napoveda);
     assert(rozeberPrikaz("h cokoli").typ == TypPrikazu::Napoveda);  // zbytek se ignoruje
@@ -248,6 +292,7 @@ void test_vytiskni_napovedu() {
         "OSTATNI\n"
         "  u                Vrati posledni zmenu (u znovu = zpet).\n"
         "  z                Prepina razeni: podle ID / podle terminu.\n"
+        "  vz [n]           Verze aktivniho seznamu; vz <n> obnovi verzi n.\n"
         "  s                Ulozi vsechny seznamy.\n"
         "  q                Ulozi a ukonci program.\n"
         "  zh               Zmeni heslo souboru.\n"
@@ -367,7 +412,7 @@ void test_vykresli_prazdny_seznam() {
         "\033[90mukol: p pridat · o hotovo · r odebrat · e upravit\n"
         "      m presunout · t termin · pr priorita · c uklidit · a archiv · ob obnovit\n"
         "seznam: n novy · v vybrat · j prejmenovat · d smazat\n"
-        "jine: u zpet · z razeni · s ulozit · zh heslo · q konec · h napoveda\033[0m\n"
+        "jine: u zpet · z razeni · s ulozit · zh heslo · q konec · h napoveda · vz verze\033[0m\n"
         "> ");
 }
 
@@ -386,7 +431,7 @@ void test_vykresli_ukoly_hotovy_sede() {
         "\033[90mukol: p pridat · o hotovo · r odebrat · e upravit\n"
         "      m presunout · t termin · pr priorita · c uklidit · a archiv · ob obnovit\n"
         "seznam: n novy · v vybrat · j prejmenovat · d smazat\n"
-        "jine: u zpet · z razeni · s ulozit · zh heslo · q konec · h napoveda\033[0m\n"
+        "jine: u zpet · z razeni · s ulozit · zh heslo · q konec · h napoveda · vz verze\033[0m\n"
         "> ");
 }
 
@@ -406,7 +451,7 @@ void test_vykresli_se_zpravou() {
         "\033[90mukol: p pridat · o hotovo · r odebrat · e upravit\n"
         "      m presunout · t termin · pr priorita · c uklidit · a archiv · ob obnovit\n"
         "seznam: n novy · v vybrat · j prejmenovat · d smazat\n"
-        "jine: u zpet · z razeni · s ulozit · zh heslo · q konec · h napoveda\033[0m\n"
+        "jine: u zpet · z razeni · s ulozit · zh heslo · q konec · h napoveda · vz verze\033[0m\n"
         "> ");
 }
 
@@ -939,6 +984,10 @@ int main() {
     test_presunout_prikaz();
     test_bezargumentove_prikazy();
     test_archiv_prikazy();
+    test_sestav_git_prikaz();
+    test_parsuj_verze();
+    test_vytiskni_verze();
+    test_verze_prikaz();
     test_vytiskni_archiv();
     test_slozene_id();
     test_termin_prikaz();
