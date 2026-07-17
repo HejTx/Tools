@@ -33,6 +33,10 @@ std::string cestaSeznamu(const std::string& adresar, const std::string& nazev) {
     return adresar + "/seznamy/" + nazev + ".txt";
 }
 
+std::string cestaArchivu(const std::string& adresar, const std::string& nazev) {
+    return cestaSeznamu(adresar, nazev + ".hotove");
+}
+
 std::string cestaNastaveni(const std::string& adresar) {
     if (adresar.empty()) return "nastaveni.txt";
     return adresar + "/nastaveni.txt";
@@ -180,6 +184,19 @@ bool migrujStaryFormat(const std::string& staraCesta, const std::string& adresar
     return true;
 }
 
+// Načte archiv seznamu týmž heslem; nedešifrovatelný soubor odloží stranou.
+void nactiArchiv(Seznam& seznam, const std::string& cesta, const std::string& heslo) {
+    std::optional<std::string> obsah = nactiObsahSouboru(cesta);
+    if (!obsah) return;
+    std::optional<VysledekDesifrovani> vysledek = desifruj(*obsah, heslo);
+    if (!vysledek) {
+        std::rename(cesta.c_str(), (cesta + ".poskozeny").c_str());
+        std::cout << "Archiv " << cesta << " nelze desifrovat, odlozen jako .poskozeny.\n";
+        return;
+    }
+    seznam.archiv = parsujUkoly(vysledek->plaintext);
+}
+
 int main() {
     if (sodium_init() < 0) {
         std::cerr << "Nepodarilo se inicializovat libsodium.\n";
@@ -201,7 +218,10 @@ int main() {
         std::string slozka = adresar.empty() ? "seznamy" : adresar + "/seznamy";
         for (const auto& polozka : std::filesystem::directory_iterator(slozka, ec)) {
             if (polozka.is_regular_file() && polozka.path().extension() == ".txt") {
-                nazvy.push_back(polozka.path().stem().string());
+                std::string jmeno = polozka.path().stem().string();
+                // archivni soubory <nazev>.hotove.txt nejsou seznamy
+                if (jmeno.size() >= 7 && jmeno.substr(jmeno.size() - 7) == ".hotove") continue;
+                nazvy.push_back(jmeno);
             }
         }
         std::sort(nazvy.begin(), nazvy.end());
@@ -267,11 +287,13 @@ int main() {
             std::optional<std::string> heslo = prectiHeslo("Heslo: ");
             if (!heslo) return 0;
             std::optional<VysledekDesifrovani> vysledek = desifruj(*obsah, *heslo);
-            sodium_memzero(heslo->data(), heslo->size());
             if (!vysledek) {
+                sodium_memzero(heslo->data(), heslo->size());
                 std::cout << "Spatne heslo nebo poskozeny soubor, zkus to znovu.\n";
                 continue;
             }
+            nactiArchiv(*existujici, cestaArchivu(adresar, nazev), *heslo);
+            sodium_memzero(heslo->data(), heslo->size());
             existujici->ukoly = parsujUkoly(vysledek->plaintext);
             existujici->klic = std::move(vysledek->klic);
             existujici->sul = vysledek->sul;
@@ -311,6 +333,13 @@ int main() {
             if (!seznam.odemceno) continue;
             if (ulozSeznamDoSouboru(seznam, cestaSeznamu(adresar, seznam.nazev))) {
                 odemceneNazvy.insert(seznam.nazev);
+                std::string archivCesta = cestaArchivu(adresar, seznam.nazev);
+                if (seznam.archiv.empty()) {
+                    std::remove(archivCesta.c_str());
+                } else if (!ulozUkolyDoSouboru(seznam.archiv, seznam.klic, seznam.sul,
+                                               archivCesta)) {
+                    ok = false;
+                }
             } else {
                 ok = false;
             }
@@ -323,7 +352,10 @@ int main() {
                 for (const auto& seznam : stav.seznamy) {
                     if (seznam.nazev == nazev) existuje = true;
                 }
-                if (!existuje) std::remove(cestaSeznamu(adresar, nazev).c_str());
+                if (!existuje) {
+                    std::remove(cestaSeznamu(adresar, nazev).c_str());
+                    std::remove(cestaArchivu(adresar, nazev).c_str());
+                }
             }
         }
         nastaveni.razeni = stav.razeni;
@@ -371,7 +403,7 @@ int main() {
         bool sledovatZmenu =
             prikaz.typ != TypPrikazu::Zpet && prikaz.typ != TypPrikazu::Ulozit &&
             prikaz.typ != TypPrikazu::Napoveda && prikaz.typ != TypPrikazu::ZmenaHesla &&
-            prikaz.typ != TypPrikazu::Neznamy;
+            prikaz.typ != TypPrikazu::Archiv && prikaz.typ != TypPrikazu::Neznamy;
         bool preskocSnapshot = false;
         StavSeznamu zaloha;
         if (sledovatZmenu) zaloha = stav;
@@ -493,14 +525,42 @@ int main() {
                 int pocet = 0;
                 if (stav.aktivniId == 0) {
                     for (auto& seznam : stav.seznamy) {
-                        pocet += vycistiHotove(seznam.ukoly);
+                        if (seznam.odemceno) pocet += archivujHotove(seznam);
                     }
                 } else {
-                    pocet = vycistiHotove(najdiSeznam(stav.seznamy, stav.aktivniId)->ukoly);
+                    pocet = archivujHotove(*najdiSeznam(stav.seznamy, stav.aktivniId));
                 }
                 zprava = (pocet == 0)
-                             ? "Zadne hotove ukoly k odstraneni."
-                             : "Odstraneno hotovych ukolu: " + std::to_string(pocet) + ".";
+                             ? "Zadne hotove ukoly k presunuti."
+                             : "Do archivu presunuto ukolu: " + std::to_string(pocet) + ".";
+                break;
+            }
+            case TypPrikazu::Archiv: {
+                if (stav.aktivniId == 0) {
+                    zprava = "Prepni na konkretni seznam.";
+                    break;
+                }
+                std::cout << "\033[2J\033[H";
+                vytiskniArchiv(std::cout, *najdiSeznam(stav.seznamy, stav.aktivniId),
+                               dnesniKlic());
+                std::string zahodit;
+                if (!std::getline(std::cin, zahodit)) {
+                    prikaz.typ = TypPrikazu::Konec;
+                }
+                zprava.clear();
+                break;
+            }
+            case TypPrikazu::Obnovit: {
+                if (stav.aktivniId == 0) {
+                    zprava = "Prepni na konkretni seznam.";
+                    break;
+                }
+                Seznam* aktivni = najdiSeznam(stav.seznamy, stav.aktivniId);
+                if (obnovUkol(*aktivni, prikaz.id)) {
+                    zprava = "Ukol obnoven.";
+                } else {
+                    zprava = "Ukol s ID " + std::to_string(prikaz.id) + " v archivu nenalezen.";
+                }
                 break;
             }
             case TypPrikazu::Ulozit:
@@ -559,11 +619,13 @@ int main() {
                         break;
                     }
                     std::optional<VysledekDesifrovani> vysledek = desifruj(*obsah, *heslo);
-                    sodium_memzero(heslo->data(), heslo->size());
                     if (!vysledek) {
+                        sodium_memzero(heslo->data(), heslo->size());
                         zprava = "Spatne heslo.";
                         break;
                     }
+                    nactiArchiv(*cil, cestaArchivu(adresar, cil->nazev), *heslo);
+                    sodium_memzero(heslo->data(), heslo->size());
                     cil->ukoly = parsujUkoly(vysledek->plaintext);
                     cil->klic = std::move(vysledek->klic);
                     cil->sul = vysledek->sul;
@@ -632,7 +694,17 @@ int main() {
                 std::array<unsigned char, crypto_pwhash_SALTBYTES> staraSul = aktivni->sul;
                 aktivni->klic = std::move(novyKlic);
                 aktivni->sul = novaSul;
-                if (ulozSeznamDoSouboru(*aktivni, cestaSeznamu(adresar, aktivni->nazev))) {
+                bool ulozeno = ulozSeznamDoSouboru(*aktivni, cestaSeznamu(adresar, aktivni->nazev));
+                if (ulozeno) {
+                    std::string archivCesta = cestaArchivu(adresar, aktivni->nazev);
+                    if (aktivni->archiv.empty()) {
+                        std::remove(archivCesta.c_str());
+                    } else {
+                        ulozeno = ulozUkolyDoSouboru(aktivni->archiv, aktivni->klic,
+                                                     aktivni->sul, archivCesta);
+                    }
+                }
+                if (ulozeno) {
                     zprava = "Heslo zmeneno a ulozeno.";
                 } else {
                     // Nový klíč se zahazuje — jinak by pozdější úspěšné

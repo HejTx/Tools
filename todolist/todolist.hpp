@@ -361,10 +361,12 @@ inline int presunUkol(StavSeznamu& stav, int zdrojId, int ukolId, int cilId) {
     return 0;
 }
 
-// Uloží jeden seznam do jeho souboru (vlastní klíč a sůl, nová nonce).
-// Zapisuje přes dočasný soubor a rename, aby selhání zápisu nezničilo původní
-// data. Vrací false, když se zápis nezdařil.
-inline bool ulozSeznamDoSouboru(const Seznam& seznam, const std::string& cesta) {
+// Zašifruje a atomicky zapíše zadané úkoly daným klíčem a solí (temp+rename).
+// Vrací false, když se zápis nezdařil (původní soubor zůstává nedotčen).
+inline bool ulozUkolyDoSouboru(const std::vector<Task>& ukoly,
+                               const std::vector<unsigned char>& klic,
+                               const std::array<unsigned char, crypto_pwhash_SALTBYTES>& sul,
+                               const std::string& cesta) {
     const std::string docasny = cesta + ".tmp";
 
     std::ofstream out(docasny, std::ios::binary);
@@ -373,7 +375,7 @@ inline bool ulozSeznamDoSouboru(const Seznam& seznam, const std::string& cesta) 
         return false;
     }
 
-    out << zasifruj(serializujUkoly(seznam.ukoly), seznam.klic, seznam.sul);
+    out << zasifruj(serializujUkoly(ukoly), klic, sul);
     out.flush();
     if (!out) {
         std::cerr << "Zapis do souboru " << docasny << " se nezdaril, puvodni data zustavaji.\n";
@@ -389,6 +391,10 @@ inline bool ulozSeznamDoSouboru(const Seznam& seznam, const std::string& cesta) 
         return false;
     }
     return true;
+}
+
+inline bool ulozSeznamDoSouboru(const Seznam& seznam, const std::string& cesta) {
+    return ulozUkolyDoSouboru(seznam.ukoly, seznam.klic, seznam.sul, cesta);
 }
 
 // Přečte celý soubor jako syrové bajty. nullopt = soubor nejde otevřít.
